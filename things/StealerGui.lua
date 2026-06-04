@@ -86,13 +86,13 @@ local MUTATION_ORDER = {
 -- Цвета мутаций
 local MUTATION_COLORS = {
     Normal  = Color3.fromRGB(200, 200, 200),
-    Golden  = Color3.fromRGB(255, 215,   0),
-    Diamond = Color3.fromRGB(100, 220, 255),
-    Ruby    = Color3.fromRGB(220,  50,  50),
-    Rainbow = Color3.fromRGB(255, 120, 200),
-    Blood   = Color3.fromRGB(160,   0,   0),
-    Neon    = Color3.fromRGB( 80, 255, 120),
-    Divine  = Color3.fromRGB(200, 150, 255),
+    Golden  = Color3.fromRGB(255, 247,   0),
+    Diamond = Color3.fromRGB(25, 255, 255),
+    Ruby    = Color3.fromRGB(255,  23,  55),
+    Rainbow = Color3.fromRGB(0, 255, 170),
+    Blood   = Color3.fromRGB(255,   0,   0),
+    Neon    = Color3.fromRGB(215, 255, 0),
+    Divine  = Color3.fromRGB(255, 232, 36),
 }
 
 -- Список мутаций в порядке от худшей к лучшей (для UI)
@@ -139,6 +139,7 @@ local activeFilters = {
 local petCache = {}
 
 -- Функция: извлечь данные пета из его InfoGUI и Head
+-- Функция: извлечь данные пета из его InfoGUI и Head (ОБНОВЛЕННАЯ СТРУКТУРА)
 local function extractPetData(pet, rarityKey)
     local data = {
         rarityKey = rarityKey,
@@ -151,19 +152,26 @@ local function extractPetData(pet, rarityKey)
         prompt    = nil,
     }
 
-    -- InfoGUI
+    -- ══════════════════════════════════════════════════════════════
+    -- 4. ОБНОВЛЕННЫЙ ПУТЬ ЧЕРЕЗ TextLabels
+    -- ══════════════════════════════════════════════════════════════
     local infoGUI = pet:FindFirstChild("InfoGUI")
     if infoGUI then
-        local nameLabel     = infoGUI:FindFirstChild("Name")
-        local rarityLabel   = infoGUI:FindFirstChild("Rarity")
-        local mutLabel      = infoGUI:FindFirstChild("Mutation")
-        local timerLabel    = infoGUI:FindFirstChild("Timer")
-        local earningsLabel = infoGUI:FindFirstChild("Earnings")
+        -- Переходим в папку TextLabels, где лежат все текстовые свойства
+        local textLabels = infoGUI:FindFirstChild("TextLabels")
+        if textLabels then
+            local nameLabel     = textLabels:FindFirstChild("Name")
+            local rarityLabel   = textLabels:FindFirstChild("Rarity")
+            local mutLabel      = textLabels:FindFirstChild("Mutation")
+            local timerLabel    = textLabels:FindFirstChild("Timer")
+            local earningsLabel = textLabels:FindFirstChild("Earnings")
 
-        if nameLabel     then data.name      = nameLabel.Text     end
-        if mutLabel      then data.mutation  = mutLabel.Text      end
-        if timerLabel    then data.timerText = timerLabel.Text    end
-        if earningsLabel then data.earnings  = earningsLabel.Text end
+            -- Извлекаем текст и очищаем от HTML/RichText тегов (если они есть)
+            if nameLabel     then data.name      = nameLabel.Text:gsub("<[^<>]+>", "") end
+            if mutLabel      then data.mutation  = mutLabel.Text:gsub("<[^<>]+>", "") end
+            if timerLabel    then data.timerText = timerLabel.Text end
+            if earningsLabel then data.earnings  = earningsLabel.Text:gsub("<[^<>]+>", "") end
+        end
     end
 
     -- Head + ProximityPrompt
@@ -326,7 +334,7 @@ closeBtn.Position       = UDim2.new(1, -38, 0.5, -16)
 closeBtn.BackgroundColor3= Color3.fromRGB(180, 40, 60)
 closeBtn.BorderSizePixel = 0
 closeBtn.Font           = Enum.Font.GothamBold
-closeBtn.Text           = "✕"
+closeBtn.Text           = "X"
 closeBtn.TextColor3     = Color3.fromRGB(255, 255, 255)
 closeBtn.TextSize       = 15
 closeBtn.ZIndex         = 6
@@ -475,6 +483,7 @@ local function createCheckbox(parent, key, displayText, textColor, defaultOn, on
         and Color3.fromRGB(25, 35, 70)
         or  Color3.fromRGB(18, 22, 45)
     btn.BorderSizePixel   = 0
+    btn.Text              = ""
     btn.ZIndex            = 6
     btn.Parent            = parent
 
@@ -619,7 +628,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
     TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
         Size = targetSize
     }):Play()
-    minimizeBtn.Text = isMinimized and "□" or "—"
+    minimizeBtn.Text = isMinimized and "—" or "—"
     filterPanel.Visible  = not isMinimized
     listContainer.Visible= not isMinimized
 end)
@@ -789,7 +798,7 @@ local function createPetCard(pet, data)
     local mutColorHex = string.format("rgb(%d,%d,%d)", mutColor.R*255, mutColor.G*255, mutColor.B*255)
 
     subLabel.Text = string.format(
-        '<font color="%s"><b>%s</b></font>  <font color="%s">✦ %s</font>',
+        '<font color="%s"><b>%s</b></font>  <font color="%s">🌟 %s</font>',
         rarColorHex,
         RARITY_DISPLAY[data.rarityKey] or data.rarityKey,
         mutColorHex,
