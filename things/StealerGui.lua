@@ -809,7 +809,7 @@ local function createPetCard(pet, data)
     local timerLabel = Instance.new("TextLabel")
     timerLabel.Name           = "TimerLabel"
     timerLabel.Size           = UDim2.new(1, 0, 0, 16)
-    timerLabel.Position       = UDim2.new(0, 55, 0, 48)
+    timerLabel.Position       = UDim2.new(0, 60, 0, 45)
     timerLabel.BackgroundTransparency = 1
     timerLabel.Font           = Enum.Font.Gotham
     timerLabel.Text           = "⏱ " .. (data.timerText or "—")
@@ -958,7 +958,7 @@ function _G.PetMonitorRenderList()
             countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
 
             -- А вот и твоя задержка в 0.2 секунды перед следующим петом
-            task.wait(0.2)
+            task.wait(0.07)
         end
     end)
 end
