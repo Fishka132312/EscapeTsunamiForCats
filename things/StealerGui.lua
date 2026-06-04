@@ -911,7 +911,15 @@ local function getCardSortOrder(data)
 end
 
 -- Глобальная функция рендера (вызывается из CheckBox коллбэков)
+-- Храним уникальный идентификатор текущего процесса рендера
+local currentRenderId = 0
+
+-- Глобальная функция рендера (вызывается из CheckBox коллбэков)
 function _G.PetMonitorRenderList()
+    -- Увеличиваем ID, чтобы прервать предыдущий рендер, если он еще идет
+    currentRenderId = currentRenderId + 1
+    local myRenderId = currentRenderId
+
     -- Убрать все текущие карточки
     for _, f in pairs(cardFrames) do
         f:Destroy()
@@ -933,15 +941,26 @@ function _G.PetMonitorRenderList()
         return getCardSortOrder(a.data) < getCardSortOrder(b.data)
     end)
 
-    -- Создаём карточки
-    for i, entry in ipairs(filtered) do
-        local card = createPetCard(entry.pet, entry.data)
-        card.LayoutOrder = i
-        cardFrames[entry.pet] = card
-        shown = shown + 1
-    end
+    -- Запускаем асинхронное создание карточек, чтобы не вешать главный поток
+    task.spawn(function()
+        for i, entry in ipairs(filtered) do
+            -- ПРОВЕРКА: если кликнули по другому фильтру, этот рендер нам больше не нужен!
+            if currentRenderId ~= myRenderId then 
+                break 
+            end
 
-    countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+            local card = createPetCard(entry.pet, entry.data)
+            card.LayoutOrder = i
+            cardFrames[entry.pet] = card
+            shown = shown + 1
+
+            -- Обновляем счетчик в реальном времени
+            countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+
+            -- А вот и твоя задержка в 0.2 секунды перед следующим петом
+            task.wait(0.2)
+        end
+    end)
 end
 
 -- ══════════════════════════════════════════════════════════════
