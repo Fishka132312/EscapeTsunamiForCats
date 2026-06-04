@@ -64,6 +64,32 @@ Tab:AddButton({
         end
     end    
 })
+
+local Tab = Window:MakeTab({
+	Name = "Dupe Pets",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+Tab:AddButton({
+    Name = "Dupe",
+    Callback = function()
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local fuseEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestFuse")
+local backpack = Players.LocalPlayer:WaitForChild("Backpack")
+
+local singleTool = backpack:FindFirstChildWhichIsA("Tool")
+
+if singleTool then
+    local fakeData = { singleTool, singleTool, singleTool }
+    
+    fuseEvent:FireServer(fakeData)
+else
+end
+    end    
+})
 --------------------------------MISC-----------------------------
 
 local Tab = Window:MakeTab({
