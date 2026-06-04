@@ -823,7 +823,7 @@ local function createPetCard(pet, data)
     local earningsLabel = Instance.new("TextLabel")
     earningsLabel.Name           = "EarningsLabel"
     earningsLabel.Size           = UDim2.new(0, 80, 0, 16)
-    earningsLabel.Position       = UDim2.new(0, 0, 1, 48)
+    earningsLabel.Position       = UDim2.new(0, 0, 1, -26)
     earningsLabel.BackgroundTransparency = 1
     earningsLabel.Font           = Enum.Font.GothamBold
     earningsLabel.Text           = "💰 " .. (data.earnings or "—")
