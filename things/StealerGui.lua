@@ -809,7 +809,7 @@ local function createPetCard(pet, data)
     local timerLabel = Instance.new("TextLabel")
     timerLabel.Name           = "TimerLabel"
     timerLabel.Size           = UDim2.new(1, 0, 0, 16)
-    timerLabel.Position       = UDim2.new(0, 0, 0, 44)
+    timerLabel.Position       = UDim2.new(0, 30, 0, 48)
     timerLabel.BackgroundTransparency = 1
     timerLabel.Font           = Enum.Font.Gotham
     timerLabel.Text           = "⏱ " .. (data.timerText or "—")
@@ -823,7 +823,7 @@ local function createPetCard(pet, data)
     local earningsLabel = Instance.new("TextLabel")
     earningsLabel.Name           = "EarningsLabel"
     earningsLabel.Size           = UDim2.new(0, 80, 0, 16)
-    earningsLabel.Position       = UDim2.new(0, 15, 1, -22)
+    earningsLabel.Position       = UDim2.new(0, 0, 1, -16)
     earningsLabel.BackgroundTransparency = 1
     earningsLabel.Font           = Enum.Font.GothamBold
     earningsLabel.Text           = "💰 " .. (data.earnings or "—")
