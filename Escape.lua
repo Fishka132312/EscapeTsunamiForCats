@@ -5,7 +5,7 @@ local Tab = Window:MakeTab({
 	Name = "Main",
 	Icon = "rbxassetid://4483345998",
 	PremiumOnly = false
-})
+}) 
 
 
 Tab:AddButton({
@@ -26,6 +26,14 @@ local target = workspace:GetChildren()[50]
 hrp.CFrame = (target:IsA("Model") and target:GetPivot() or target.CFrame) * CFrame.new(0, 3, 0)
     end    
 }) 
+
+Tab:AddButton({
+    Name = "Monitoring pets",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/StealerGui.lua'))()
+    end    
+})
+
 
 Tab:AddSlider({
     Name = "Change Speed",
