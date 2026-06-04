@@ -483,6 +483,7 @@ local function createCheckbox(parent, key, displayText, textColor, defaultOn, on
         and Color3.fromRGB(25, 35, 70)
         or  Color3.fromRGB(18, 22, 45)
     btn.BorderSizePixel   = 0
+    btn.Text              = ""
     btn.ZIndex            = 6
     btn.Parent            = parent
 
