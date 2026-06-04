@@ -90,6 +90,41 @@ else
 end
     end    
 })
+
+Tab:AddToggle({
+	Name = "Loop Dupe",
+	Default = false,
+	Callback = function(Value)
+		-- Создаем флаг внутри функции, чтобы отслеживать состояние
+		_G.isFusing = Value 
+		print(Value)
+
+		if _G.isFusing then
+			task.spawn(function()
+				-- Получаем сервисы прямо здесь, чтобы не засорять начало скрипта
+				local ReplicatedStorage = game:GetService("ReplicatedStorage")
+				local Players = game:GetService("Players")
+				local fuseEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestFuse")
+				local player = Players.LocalPlayer
+
+				while _G.isFusing do
+					local backpack = player:FindFirstChild("Backpack")
+					
+					if backpack then
+						local singleTool = backpack:FindFirstChildWhichIsA("Tool")
+						
+						if singleTool then
+							local fakeData = { singleTool, singleTool, singleTool }
+							fuseEvent:FireServer(fakeData)
+						end
+					end
+					
+					task.wait(0.5) -- Задержка полсекунды, чтобы не крашнуло
+				end
+			end)
+		end
+	end    
+})
 --------------------------------MISC-----------------------------
 
 local Tab = Window:MakeTab({
