@@ -64,10 +64,10 @@ local RARITY_DISPLAY = {
 -- Цвета редкостей
 local RARITY_COLORS = {
     Common          = Color3.fromRGB(180, 180, 180),
-    Epic            = Color3.fromRGB(160,  80, 240),
-    Mythic          = Color3.fromRGB(255, 150,  50),
-    Legendary       = Color3.fromRGB(255, 215,   0),
-    OG              = Color3.fromRGB(255,  60,  60),
+    Epic            = Color3.fromRGB(253,  61, 253),
+    Mythic          = Color3.fromRGB(255, 99,  152),
+    Legendary       = Color3.fromRGB(255, 138,   0),
+    OG              = Color3.fromRGB(52,  214,  137),
     SpecialItemSpawn= Color3.fromRGB( 80, 220, 255),
 }
 
