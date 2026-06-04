@@ -27,6 +27,25 @@ hrp.CFrame = (target:IsA("Model") and target:GetPivot() or target.CFrame) * CFra
     end    
 }) 
 
+Tab:AddSlider({
+    Name = "Change Speed",
+    Min = 0,
+    Max = 200,
+    Default = 22,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 1,
+    ValueName = "Speed",
+    Callback = function(Value)
+        local player = game.Players.LocalPlayer
+        if player and player.Character then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = Value
+            end
+        end
+    end    
+})
+
 
 
 local Tab = Window:MakeTab({
@@ -95,13 +114,11 @@ Tab:AddToggle({
 	Name = "Loop Dupe",
 	Default = false,
 	Callback = function(Value)
-		-- Создаем флаг внутри функции, чтобы отслеживать состояние
 		_G.isFusing = Value 
 		print(Value)
 
 		if _G.isFusing then
 			task.spawn(function()
-				-- Получаем сервисы прямо здесь, чтобы не засорять начало скрипта
 				local ReplicatedStorage = game:GetService("ReplicatedStorage")
 				local Players = game:GetService("Players")
 				local fuseEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestFuse")
@@ -119,7 +136,7 @@ Tab:AddToggle({
 						end
 					end
 					
-					task.wait(0.5) -- Задержка полсекунды, чтобы не крашнуло
+					task.wait(0.5)
 				end
 			end)
 		end
@@ -139,27 +156,39 @@ Tab:AddButton({
   	end    
 })
 
-Tab:AddButton({
-	Name = "Auto Speed",
-	Callback = function()
-        while true do
-            local args = {
-	10
-}
-game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
-wait(0.5)
-end
-  	end    
+Tab:AddToggle({
+    Name = "Auto Purchase Speed",
+    Default = false,
+    Callback = function(Value)
+        local speedbuy = Value
+        
+        if speedbuy then
+            task.spawn(function()
+                while speedbuy do
+                    local args = {10}
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
+                    task.wait(0.5)
+                end
+            end)
+        end
+    end    
 })
 
-Tab:AddButton({
-	Name = "Auto Rebirth",
-	Callback = function()
-        while true do
-            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
-            wait(2)
+Tab:AddToggle({
+    Name = "Auto Purchase Rebirth",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoRebirth = Value
+        
+        if _G.AutoRebirth then
+            task.spawn(function()
+                while _G.AutoRebirth do
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
+                    task.wait(2)
+                end
+            end)
         end
-  	end    
+    end    
 })
 
 Tab:AddButton({
@@ -175,27 +204,32 @@ game:GetService("ReplicatedStorage"):WaitForChild("TimeProgressEvent"):FireServe
   	end    
 })
 
-Tab:AddButton({
-	Name = "Redeem Maxwell",
-	Callback = function()
-            while true do
-                game:GetService("ReplicatedStorage"):WaitForChild("GiveRewardEvent"):FireServer()
-                wait(2)
-            end
-  	end    
+Tab:AddToggle({
+    Name = "Redeem Maxwell",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoRewardEnabled = Value 
+        
+        if _G.AutoRewardEnabled then
+            task.spawn(function()
+                while _G.AutoRewardEnabled do
+                    game:GetService("ReplicatedStorage"):WaitForChild("GiveRewardEvent"):FireServer()
+                    task.wait(2)
+                end
+            end)
+        end
+    end    
 })
 
 Tab:AddToggle({
 	Name = "Loop Dupe",
 	Default = false,
 	Callback = function(Value)
-		-- Создаем флаг внутри функции, чтобы отслеживать состояние
 		_G.isFusing = Value 
 		print(Value)
 
 		if _G.isFusing then
 			task.spawn(function()
-				-- Получаем сервисы прямо здесь, чтобы не засорять начало скрипта
 				local ReplicatedStorage = game:GetService("ReplicatedStorage")
 				local Players = game:GetService("Players")
 				local fuseEvent = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestFuse")
@@ -213,7 +247,7 @@ Tab:AddToggle({
 						end
 					end
 					
-					task.wait(0.5) -- Задержка полсекунды, чтобы не крашнуло
+					task.wait(0.5)
 				end
 			end)
 		end
@@ -221,19 +255,44 @@ Tab:AddToggle({
 })
 
 local Tab = Window:MakeTab({
-	Name = "Rebirth",
+	Name = "Auto Buy",
 	Icon = "rbxassetid://4483345998",
 	PremiumOnly = false
 })
 
-Tab:AddButton({
-	Name = "Auto Rebirth",
-	Callback = function()
-        while true do
-            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
-            wait(0.5)
+Tab:AddToggle({
+    Name = "Auto Purchase Speed",
+    Default = false,
+    Callback = function(Value)
+        local speedbuy = Value
+        
+        if speedbuy then
+            task.spawn(function()
+                while speedbuy do
+                    local args = {10}
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
+                    task.wait(0.5)
+                end
+            end)
         end
-  	end    
+    end    
+})
+
+Tab:AddToggle({
+    Name = "Auto Purchase Rebirth",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoRebirth = Value
+        
+        if _G.AutoRebirth then
+            task.spawn(function()
+                while _G.AutoRebirth do
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
+                    task.wait(2)
+                end
+            end)
+        end
+    end    
 })
 
 --------------------------------MISC-----------------------------
