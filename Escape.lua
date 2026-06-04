@@ -156,30 +156,10 @@ local Tab = Window:MakeTab({
 Tab:AddButton({
 	Name = "Auto Rebirth",
 	Callback = function()
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RequestRebirth = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestRebirth")
-local UserInputService = game:GetService("UserInputService")
-
-print("Тестовый скрипт загружен. Нажми 'K', чтобы отправить запрос на ребирт.")
-
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    
-    if input.KeyCode == Enum.KeyCode.K then
-        print("Попытка отправить запрос на сервер...")
-        
-        -- Оборачиваем в pcall, чтобы увидеть ошибку, если она будет
-        local success, err = pcall(function()
-            RequestRebirth:FireServer()
-        end)
-        
-        if success then
-            print("Запрос успешно отправлен на сервер.")
-        else
-            warn("Ошибка при отправке:", err)
+        while true do
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
+            wait(2)
         end
-    end
-end)
   	end    
 })
 
