@@ -934,7 +934,6 @@ local function getCardSortOrder(data)
     return rO * 10000 + mO * 1000 + math.floor(timerVal)
 end
 
--- Глобальная функция рендера (вызывается из CheckBox коллбэков)
 local currentRenderId = 0
 
 function _G.PetMonitorRenderList()
@@ -964,37 +963,53 @@ function _G.PetMonitorRenderList()
         end
     end
 
-    -- Считаем сколько осталось
+    -- Создаем отдельную таблицу-очередь чисто для новых петов
+    local newPetsQueue = {}
+
+    -- === ЭТАП 1: МГНОВЕННОЕ ОБНОВЛЕНИЕ СТАРЫХ ПЕТОВ ===
+    -- Пробегаемся по всему списку. Если пет уже есть — обновляем его БЕЗ ЗАДЕРЖЕК
+    for i, entry in ipairs(filtered) do
+        local pet = entry.pet
+        local data = entry.data
+        local card = cardFrames[pet]
+
+        if card then
+            -- Пет уже на экране: мгновенно меняем порядок и обновляем таймеры/деньги
+            card.LayoutOrder = i
+            updateCardDynamicData(card, data)
+        else
+            -- Пета нет: не создаем его тут, а просто откладываем в очередь новичков
+            table.insert(newPetsQueue, { index = i, pet = pet, data = data })
+        end
+    end
+
+    -- Считаем, сколько петов СЕЙЧАС реально отображается (наши старые выжившие петы)
     local shown = 0
     for _ in pairs(cardFrames) do shown = shown + 1 end
     countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
 
-    -- Асинхронно прогружаем и обновляем список
-    task.spawn(function()
-        for i, entry in ipairs(filtered) do
-            if currentRenderId ~= myRenderId then break end
+    -- === ЭТАП 2: ПЛАВНЫЙ СПАВН ТОЛЬКО ДЛЯ НОВЫХ ПЕТОВ ===
+    -- Если в очереди есть новички, запускаем асинхронный поток с задержкой
+    if #newPetsQueue > 0 then
+        task.spawn(function()
+            for _, info in ipairs(newPetsQueue) do
+                -- Если игрок переключил чекбокс и запустился новый рендер — мгновенно стопаем этот цикл
+                if currentRenderId ~= myRenderId then break end
 
-            local pet = entry.pet
-            local data = entry.data
-            local card = cardFrames[pet]
-
-            if card then
-                -- Пет уже на экране: меняем порядок и обновляем текст (таймер + деньги)
-                card.LayoutOrder = i
-                updateCardDynamicData(card, data)
-            else
-                -- Новый пет: создаем плавно с задержкой 0.2 сек
-                card = createPetCard(pet, data)
-                card.LayoutOrder = i
-                cardFrames[pet] = card
+                -- Создаем карточку для нового пета
+                local card = createPetCard(info.pet, info.data)
+                card.LayoutOrder = info.index
+                cardFrames[info.pet] = card
                 
+                -- Увеличиваем счетчик на экране
                 shown = shown + 1
                 countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
                 
+                -- А вот теперь с чистой совестью делаем задержку 0.2 сек перед следующим НОВЫМ петом
                 task.wait(0.2)
             end
         end
-    end)
+    end
 end
 
 -- ══════════════════════════════════════════════════════════════
