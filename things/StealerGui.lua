@@ -917,9 +917,9 @@ function _G.PetMonitorRenderList()
     currentRenderId = currentRenderId + 1
     local myRenderId = currentRenderId
 
-    -- 1. Собираем отфильтрованных и отсортированных петов
+    -- Собираем отфильтрованных и отсортированных петов
     local filtered = {}
-    local filteredSet = {} -- Быстрый поиск: есть ли пет в новом списке?
+    local filteredSet = {}
     
     for pet, data in pairs(petCache) do
         if petPassesFilter(data) then
@@ -932,7 +932,7 @@ function _G.PetMonitorRenderList()
         return getCardSortOrder(a.data) < getCardSortOrder(b.data)
     end)
 
-    -- 2. МГНОВЕННО удаляем тех петов, которые БОЛЬШЕ НЕ ПРОХОДЯТ фильтр
+    -- Мгновенно удаляем тех, кто скрылся из фильтров
     for pet, card in pairs(cardFrames) do
         if not filteredSet[pet] then
             card:Destroy()
@@ -940,43 +940,49 @@ function _G.PetMonitorRenderList()
         end
     end
 
-    -- Считаем, сколько петов УЖЕ отображается (из тех, что остались)
-    local shown = 0
-    for _ in pairs(cardFrames) do
-        shown = shown + 1
+    -- ОЧЕРЕДЬ ДЛЯ НОВЫХ ПЕТОВ
+    local newPetsQueue = {}
+
+    -- 1. ЭТАП: Мгновенно обновляем всех СТАРЫХ петов (без лагов и задержек)
+    for i, entry in ipairs(filtered) do
+        local pet = entry.pet
+        local data = entry.data
+        local card = cardFrames[pet]
+
+        if card then
+            -- Пет уже есть — обновляем ЕМУ ВСЁ МГНОВЕННО
+            card.LayoutOrder = i
+            updateCardDynamicData(card, data)
+        else
+            -- Пета нет — запоминаем его индекс и данные для плавной прогрузки
+            table.insert(newPetsQueue, { index = i, pet = pet, data = data })
+        end
     end
+
+    -- Считаем сколько сейчас реально на экране (старых)
+    local shown = 0
+    for _ in pairs(cardFrames) do shown = shown + 1 end
     countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
 
-    -- 3. Плавный апдейт и создание новых карточек
-    task.spawn(function()
-        for i, entry in ipairs(filtered) do
-            -- Проверка на то, что юзер не кликнул по фильтру еще раз
-            if currentRenderId ~= myRenderId then break end
+    -- 2. ЭТАП: Асинхронно и плавно рожаем ТОЛЬКО НОВЫХ петов
+    if #newPetsQueue > 0 then
+        task.spawn(function()
+            for _, info in ipairs(newPetsQueue) do
+                -- Если прилетел новый рендер — стопаем этот поток
+                if currentRenderId ~= myRenderId then break end
 
-            local pet = entry.pet
-            local data = entry.data
-            local card = cardFrames[pet]
-
-            if card then
-                -- Пет УЖЕ БЫЛ на экране! 
-                -- Просто обновляем его позицию в списке и, если надо, текст/таймер
-                card.LayoutOrder = i
-                -- Если у тебя внутри createPetCard есть функция обновления, 
-                -- можно вызвать её тут, например: updatePetCardData(card, data)
-            else
-                -- Пета НЕ БЫЛО. Создаем новую карточку с задержкой!
-                card = createPetCard(pet, data)
-                card.LayoutOrder = i
-                cardFrames[pet] = card
+                local card = createPetCard(info.pet, info.data)
+                card.LayoutOrder = info.index
+                cardFrames[info.pet] = card
                 
                 shown = shown + 1
                 countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
                 
-                -- Задержку делаем ТОЛЬКО при создании НОВЫХ карточек
+                -- Задержка только между созданием НОВЫХ карточек
                 task.wait(0.2)
             end
         end
-    end)
+    end
 end
 
 -- ══════════════════════════════════════════════════════════════
