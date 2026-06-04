@@ -133,6 +133,35 @@ local Tab = Window:MakeTab({
 })
 
 Tab:AddButton({
+	Name = "Tp to Mission",
+	Callback = function()
+            game.Players.LocalPlayer.Character:MoveTo(workspace.MissionTouch.Position)
+  	end    
+})
+
+Tab:AddButton({
+	Name = "Auto Speed",
+	Callback = function()
+        while true do
+            local args = {
+	10
+}
+game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
+wait(0.5)
+  	end    
+})
+
+Tab:AddButton({
+	Name = "Auto Rebirth",
+	Callback = function()
+        while true do
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
+            wait(2)
+        end
+  	end    
+})
+
+Tab:AddButton({
 	Name = "Skip Time",
 	Callback = function()
       		local args = {
@@ -142,8 +171,6 @@ Tab:AddButton({
 }
 
 game:GetService("ReplicatedStorage"):WaitForChild("TimeProgressEvent"):FireServer(unpack(args))
-
-
   	end    
 })
 
