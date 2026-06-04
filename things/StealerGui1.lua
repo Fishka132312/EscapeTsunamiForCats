@@ -334,7 +334,7 @@ closeBtn.Position       = UDim2.new(1, -38, 0.5, -16)
 closeBtn.BackgroundColor3= Color3.fromRGB(180, 40, 60)
 closeBtn.BorderSizePixel = 0
 closeBtn.Font           = Enum.Font.GothamBold
-closeBtn.Text           = "✕"
+closeBtn.Text           = "X"
 closeBtn.TextColor3     = Color3.fromRGB(255, 255, 255)
 closeBtn.TextSize       = 15
 closeBtn.ZIndex         = 6
@@ -628,7 +628,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
     TweenService:Create(mainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {
         Size = targetSize
     }):Play()
-    minimizeBtn.Text = isMinimized and "□" or "—"
+    minimizeBtn.Text = isMinimized and "—" or "—"
     filterPanel.Visible  = not isMinimized
     listContainer.Visible= not isMinimized
 end)
