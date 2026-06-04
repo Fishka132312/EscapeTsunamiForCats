@@ -156,15 +156,17 @@ Tab:AddButton({
   	end    
 })
 
+local isSpeedEnabled = false 
+
 Tab:AddToggle({
     Name = "Auto Purchase Speed",
     Default = false,
     Callback = function(Value)
-        local speedbuy = Value
+        isSpeedEnabled = Value 
         
-        if speedbuy then
+        if isSpeedEnabled then
             task.spawn(function()
-                while speedbuy do
+                while isSpeedEnabled do
                     local args = {10}
                     game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
                     task.wait(0.5)
@@ -260,15 +262,16 @@ local Tab = Window:MakeTab({
 	PremiumOnly = false
 })
 
+
 Tab:AddToggle({
     Name = "Auto Purchase Speed",
     Default = false,
     Callback = function(Value)
-        local speedbuy = Value
+        isSpeedEnabled = Value 
         
-        if speedbuy then
+        if isSpeedEnabled then
             task.spawn(function()
-                while speedbuy do
+                while isSpeedEnabled do
                     local args = {10}
                     game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
                     task.wait(0.5)
