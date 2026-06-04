@@ -911,54 +911,70 @@ local function getCardSortOrder(data)
 end
 
 -- Глобальная функция рендера (вызывается из CheckBox коллбэков)
--- Храним уникальный идентификатор текущего процесса рендера
 local currentRenderId = 0
 
--- Глобальная функция рендера (вызывается из CheckBox коллбэков)
 function _G.PetMonitorRenderList()
-    -- Увеличиваем ID, чтобы прервать предыдущий рендер, если он еще идет
     currentRenderId = currentRenderId + 1
     local myRenderId = currentRenderId
 
-    -- Убрать все текущие карточки
-    for _, f in pairs(cardFrames) do
-        f:Destroy()
-    end
-    cardFrames = {}
-
-    local shown = 0
-
-    -- Собираем петов, прошедших фильтр
+    -- 1. Собираем отфильтрованных и отсортированных петов
     local filtered = {}
+    local filteredSet = {} -- Быстрый поиск: есть ли пет в новом списке?
+    
     for pet, data in pairs(petCache) do
         if petPassesFilter(data) then
             table.insert(filtered, { pet = pet, data = data })
+            filteredSet[pet] = true
         end
     end
 
-    -- Сортируем
     table.sort(filtered, function(a, b)
         return getCardSortOrder(a.data) < getCardSortOrder(b.data)
     end)
 
-    -- Запускаем асинхронное создание карточек, чтобы не вешать главный поток
+    -- 2. МГНОВЕННО удаляем тех петов, которые БОЛЬШЕ НЕ ПРОХОДЯТ фильтр
+    for pet, card in pairs(cardFrames) do
+        if not filteredSet[pet] then
+            card:Destroy()
+            cardFrames[pet] = nil
+        end
+    end
+
+    -- Считаем, сколько петов УЖЕ отображается (из тех, что остались)
+    local shown = 0
+    for _ in pairs(cardFrames) do
+        shown = shown + 1
+    end
+    countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+
+    -- 3. Плавный апдейт и создание новых карточек
     task.spawn(function()
         for i, entry in ipairs(filtered) do
-            -- ПРОВЕРКА: если кликнули по другому фильтру, этот рендер нам больше не нужен!
-            if currentRenderId ~= myRenderId then 
-                break 
+            -- Проверка на то, что юзер не кликнул по фильтру еще раз
+            if currentRenderId ~= myRenderId then break end
+
+            local pet = entry.pet
+            local data = entry.data
+            local card = cardFrames[pet]
+
+            if card then
+                -- Пет УЖЕ БЫЛ на экране! 
+                -- Просто обновляем его позицию в списке и, если надо, текст/таймер
+                card.LayoutOrder = i
+                -- Если у тебя внутри createPetCard есть функция обновления, 
+                -- можно вызвать её тут, например: updatePetCardData(card, data)
+            else
+                -- Пета НЕ БЫЛО. Создаем новую карточку с задержкой!
+                card = createPetCard(pet, data)
+                card.LayoutOrder = i
+                cardFrames[pet] = card
+                
+                shown = shown + 1
+                countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+                
+                -- Задержку делаем ТОЛЬКО при создании НОВЫХ карточек
+                task.wait(0.2)
             end
-
-            local card = createPetCard(entry.pet, entry.data)
-            card.LayoutOrder = i
-            cardFrames[entry.pet] = card
-            shown = shown + 1
-
-            -- Обновляем счетчик в реальном времени
-            countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
-
-            -- А вот и твоя задержка в 0.2 секунды перед следующим петом
-            task.wait(0.07)
         end
     end)
 end
