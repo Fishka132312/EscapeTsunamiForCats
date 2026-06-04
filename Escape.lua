@@ -298,6 +298,14 @@ Tab:AddToggle({
     end    
 })
 
+Tab:AddToggle({
+    Name = "Remove Annoying Notifications",
+    Default = false,
+    Callback = function(Value)
+        game:GetService("Players").LocalPlayer.PlayerGui.GUI.Frames.Notifications.Visible = not Value
+    end    
+})
+
 --------------------------------MISC-----------------------------
 
 local Tab = Window:MakeTab({
