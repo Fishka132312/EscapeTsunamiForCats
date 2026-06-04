@@ -148,6 +148,7 @@ Tab:AddButton({
 }
 game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PurchaseSpeed"):FireServer(unpack(args))
 wait(0.5)
+end
   	end    
 })
 
