@@ -125,6 +125,28 @@ Tab:AddToggle({
 		end
 	end    
 })
+
+local Tab = Window:MakeTab({
+	Name = "Auto Mission (Maxwell))",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+Tab:AddButton({
+	Name = "Skip Time",
+	Callback = function()
+      		local args = {
+
+	100
+
+}
+
+game:GetService("ReplicatedStorage"):WaitForChild("TimeProgressEvent"):FireServer(unpack(args))
+
+
+  	end    
+})
+
 --------------------------------MISC-----------------------------
 
 local Tab = Window:MakeTab({
