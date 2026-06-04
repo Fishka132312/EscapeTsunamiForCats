@@ -809,7 +809,7 @@ local function createPetCard(pet, data)
     local timerLabel = Instance.new("TextLabel")
     timerLabel.Name           = "TimerLabel"
     timerLabel.Size           = UDim2.new(1, 0, 0, 16)
-    timerLabel.Position       = UDim2.new(0, 30, 0, 48)
+    timerLabel.Position       = UDim2.new(0, 55, 0, 48)
     timerLabel.BackgroundTransparency = 1
     timerLabel.Font           = Enum.Font.Gotham
     timerLabel.Text           = "⏱ " .. (data.timerText or "—")
@@ -823,7 +823,7 @@ local function createPetCard(pet, data)
     local earningsLabel = Instance.new("TextLabel")
     earningsLabel.Name           = "EarningsLabel"
     earningsLabel.Size           = UDim2.new(0, 80, 0, 16)
-    earningsLabel.Position       = UDim2.new(0, 0, 1, -16)
+    earningsLabel.Position       = UDim2.new(0, 0, 1, 48)
     earningsLabel.BackgroundTransparency = 1
     earningsLabel.Font           = Enum.Font.GothamBold
     earningsLabel.Text           = "💰 " .. (data.earnings or "—")
@@ -840,12 +840,21 @@ local function createPetCard(pet, data)
     stealBtn.Position         = UDim2.new(1, -80, 0.5, -18)
     stealBtn.BackgroundColor3 = Color3.fromRGB(220, 50, 80)
     stealBtn.BorderSizePixel  = 0
-    stealBtn.Font             = Enum.Font.GothamBold
-    stealBtn.Text             = "STEAL"
-    stealBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
-    stealBtn.TextSize         = 13
+    stealBtn.Text             = ""                      -- 💡 ИСПРАВЛЕНИЕ: Очищаем дефолтный текст кнопки
     stealBtn.ZIndex           = 7
     stealBtn.Parent           = frame
+
+    -- 💡 ИСПРАВЛЕНИЕ: Создаем отдельный TextLabel для текста, чтобы градиент его не красил
+    local stealBtnLabel = Instance.new("TextLabel")
+    stealBtnLabel.Name                    = "StealLabel"
+    stealBtnLabel.Size                    = UDim2.new(1, 0, 1, 0) -- Растягиваем на всю кнопку
+    stealBtnLabel.BackgroundTransparency = 1                     -- Делаем фон текста прозрачным
+    stealBtnLabel.Font                    = Enum.Font.GothamBold
+    stealBtnLabel.Text                    = "STEAL"
+    stealBtnLabel.TextColor3              = Color3.fromRGB(255, 255, 255) -- Чистый белый цвет!
+    stealBtnLabel.TextSize                = 13
+    stealBtnLabel.ZIndex                  = 9                     -- Ставим ZIndex ВЫШЕ градиента и кнопки
+    stealBtnLabel.Parent                  = stealBtn
 
     local sbCorner = Instance.new("UICorner")
     sbCorner.CornerRadius = UDim.new(0, 8)
