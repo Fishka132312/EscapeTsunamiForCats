@@ -175,19 +175,13 @@ game:GetService("ReplicatedStorage"):WaitForChild("TimeProgressEvent"):FireServe
   	end    
 })
 
-local Tab = Window:MakeTab({
-	Name = "Rebirth",
-	Icon = "rbxassetid://4483345998",
-	PremiumOnly = false
-})
-
 Tab:AddButton({
-	Name = "Auto Rebirth",
+	Name = "Redeem Maxwell",
 	Callback = function()
-        while true do
-            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
-            wait(0.5)
-        end
+            while true do
+                game:GetService("ReplicatedStorage"):WaitForChild("GiveRewardEvent"):FireServer()
+                wait(2)
+            end
   	end    
 })
 
@@ -224,6 +218,22 @@ Tab:AddToggle({
 			end)
 		end
 	end    
+})
+
+local Tab = Window:MakeTab({
+	Name = "Rebirth",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+})
+
+Tab:AddButton({
+	Name = "Auto Rebirth",
+	Callback = function()
+        while true do
+            game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RequestRebirth"):FireServer()
+            wait(0.5)
+        end
+  	end    
 })
 
 --------------------------------MISC-----------------------------
