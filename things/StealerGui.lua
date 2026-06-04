@@ -809,7 +809,7 @@ local function createPetCard(pet, data)
     local timerLabel = Instance.new("TextLabel")
     timerLabel.Name           = "TimerLabel"
     timerLabel.Size           = UDim2.new(1, 0, 0, 16)
-    timerLabel.Position       = UDim2.new(0, 60, 0, 45)
+    timerLabel.Position       = UDim2.new(0, 60, 0, 46)
     timerLabel.BackgroundTransparency = 1
     timerLabel.Font           = Enum.Font.Gotham
     timerLabel.Text           = "⏱ " .. (data.timerText or "—")
@@ -1060,51 +1060,67 @@ end
 -- 8. ОБНОВЛЕНИЕ ТАЙМЕРОВ (RunService.Heartbeat)
 -- ══════════════════════════════════════════════════════════════
 
--- Обновляем таймеры не каждый кадр, а раз в секунду
-local lastTimerUpdate = 0
+local currentRenderId = 0
 
-RunService.Heartbeat:Connect(function(dt)
-    lastTimerUpdate = lastTimerUpdate + dt
-    if lastTimerUpdate < 1 then return end
-    lastTimerUpdate = 0
+function _G.PetMonitorRenderList()
+    currentRenderId = currentRenderId + 1
+    local myRenderId = currentRenderId
 
-    -- Для каждого пета в кэше обновляем таймер из InfoGUI
+    -- Собираем отфильтрованных и отсортированных петов
+    local filtered = {}
+    local filteredSet = {}
+    
     for pet, data in pairs(petCache) do
-        local infoGUI = pet:FindFirstChild("InfoGUI")
-        if infoGUI then
-            local timerLabel = infoGUI:FindFirstChild("Timer")
-            if timerLabel then
-                data.timerText = timerLabel.Text
-                -- Обновляем карточку если она видима
-                local card = cardFrames[pet]
-                if card then
-                    local tb = card:FindFirstChild("TextBlock")
-                    if tb then
-                        local tl = tb:FindFirstChild("TimerLabel")
-                        if tl then
-                            tl.Text = "⏱ " .. data.timerText
-                        end
-                    end
-                end
-            end
-            -- Также обновляем earnings
-            local earningsLabel = infoGUI:FindFirstChild("Earnings")
-            if earningsLabel then
-                data.earnings = earningsLabel.Text
-                local card = cardFrames[pet]
-                if card then
-                    local tb = card:FindFirstChild("TextBlock")
-                    if tb then
-                        local el = tb:FindFirstChild("EarningsLabel")
-                        if el then
-                            el.Text = "💰 " .. data.earnings
-                        end
-                    end
-                end
-            end
+        if petPassesFilter(data) then
+            table.insert(filtered, { pet = pet, data = data })
+            filteredSet[pet] = true
         end
     end
-end)
+
+    table.sort(filtered, function(a, b)
+        return getCardSortOrder(a.data) < getCardSortOrder(b.data)
+    end)
+
+    -- Мгновенно удаляем тех, кто скрылся из фильтров
+    for pet, card in pairs(cardFrames) do
+        if not filteredSet[pet] then
+            card:Destroy()
+            cardFrames[pet] = nil
+        end
+    end
+
+    -- Считаем сколько осталось
+    local shown = 0
+    for _ in pairs(cardFrames) do shown = shown + 1 end
+    countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+
+    -- Асинхронно прогружаем и обновляем список
+    task.spawn(function()
+        for i, entry in ipairs(filtered) do
+            if currentRenderId ~= myRenderId then break end
+
+            local pet = entry.pet
+            local data = entry.data
+            local card = cardFrames[pet]
+
+            if card then
+                -- Пет уже на экране: меняем порядок и обновляем текст (таймер + деньги)
+                card.LayoutOrder = i
+                updateCardDynamicData(card, data)
+            else
+                -- Новый пет: создаем плавно с задержкой 0.2 сек
+                card = createPetCard(pet, data)
+                card.LayoutOrder = i
+                cardFrames[pet] = card
+                
+                shown = shown + 1
+                countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+                
+                task.wait(0.2)
+            end
+        end
+    end)
+end
 
 -- ══════════════════════════════════════════════════════════════
 -- 9. ПОДПИСКА НА ChildAdded / ChildRemoved
