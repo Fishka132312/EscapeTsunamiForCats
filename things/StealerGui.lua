@@ -1,4 +1,4 @@
---[[ да1
+--[[ да2
     ╔══════════════════════════════════════════════════════════════════╗
     ║              PET MONITOR — LocalScript v2.0                     ║
     ║  Мониторинг, фильтрация и кража петов в реальном времени        ║
@@ -971,7 +971,7 @@ function _G.PetMonitorRenderList()
     
     for pet, data in pairs(petCache) do
         if pet and pet.Parent and petPassesFilter(data) then
-            -- [ОБНОВЛЕНИЕ]: Считываем свежий таймер/деньги прямо из InfoGUI перед отрисовкой
+            -- Считываем свежий таймер/деньги прямо из InfoGUI перед отрисовкой
             local freshData = extractPetData(pet, data.rarityKey)
             petCache[pet] = freshData -- сохраняем обновленные данные в кэш
             
@@ -1025,17 +1025,49 @@ function _G.PetMonitorRenderList()
     end)
 
     -- ══════════════════════════════════════════════════════════════
-    -- СЕКУНДНЫЙ АВТО-ОБНОВИТЕЛЬ (ЗАПУСКАЕТСЯ ОДИН РАЗ И ЖИВЕТ В ФОНЕ)
+    -- СЕКУНДНЫЙ АВТО-ОБНОВИТЕЛЬ С ЖЕСТКИМ ПЕРЕДЕРГИВАНИЕМ ТЕКСТА
     -- ══════════════════════════════════════════════════════════════
     if not isLoopRunning then
         isLoopRunning = true
         task.spawn(function()
             while true do
-                task.wait(1.0) -- Обновляем ровно 1 раз в секунду
+                task.wait(1.0) -- Ждем ровно 1 секунду
                 
-                -- Вызываем этот же рендер. Он заново соберет свежие таймеры, 
-                -- удалит деспавнившихся и добавит новых петов.
-                _G.PetMonitorRenderList()
+                -- Проверяем, не появились ли новые петы динамически
+                local checkZones = ItemSpawners:GetChildren()
+                local foundNewPet = false
+                
+                for _, zone in ipairs(checkZones) do
+                    if RARITY_ORDER[zone.Name] then
+                        for _, pet in ipairs(zone:GetChildren()) do
+                            if not petCache[pet] and pet:FindFirstChild("InfoGUI") then
+                                foundNewPet = true
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if foundNewPet then
+                    -- Если спавнился абсолютно новый пет — делаем тяжелый полный рендер списка
+                    _G.PetMonitorRenderList()
+                else
+                    -- Если состав стабилен — НАПРЯМУЮ обновляем тексты таймеров на карточках
+                    for pet, card in pairs(cardFrames) do
+                        if pet and pet.Parent and petCache[pet] then
+                            -- Извлекаем новые данные из игры секунду спустя
+                            local newestData = extractPetData(pet, petCache[pet].rarityKey)
+                            petCache[pet] = newestData
+                            
+                            -- ПРИНУДИТЕЛЬНО пушим новое время в лейблы карточки в GUI
+                            updateCardDynamicData(card, newestData)
+                        else
+                            -- Если пет пропал с карты (собрали) — сбрасываем список
+                            _G.PetMonitorRenderList()
+                            break
+                        end
+                    end
+                end
             end
         end)
     end
