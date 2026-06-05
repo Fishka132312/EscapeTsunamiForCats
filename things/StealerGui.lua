@@ -941,14 +941,13 @@ local function getCardSortOrder(data)
     return rO * 10000 + mO * 1000 + math.floor(timerVal)
 end
 
--- Глобальная функция рендера (вызывается из CheckBox коллбэков)
 local currentRenderId = 0
 
 function _G.PetMonitorRenderList()
     currentRenderId = currentRenderId + 1
     local myRenderId = currentRenderId
 
-    -- Собираем отфильтрованных и отсортированных петов
+    -- 1. Собираем отфильтрованных и отсортированных петов
     local filtered = {}
     local filteredSet = {}
     
@@ -963,7 +962,7 @@ function _G.PetMonitorRenderList()
         return getCardSortOrder(a.data) < getCardSortOrder(b.data)
     end)
 
-    -- Мгновенно удаляем тех, кто скрылся из фильтров
+    -- 2. Мгновенно удаляем тех, кто скрылся из фильтров
     for pet, card in pairs(cardFrames) do
         if not filteredSet[pet] then
             card:Destroy()
@@ -971,14 +970,14 @@ function _G.PetMonitorRenderList()
         end
     end
 
-    -- Считаем сколько осталось
-    local shown = 0
-    for _ in pairs(cardFrames) do shown = shown + 1 end
-    countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
+    -- 3. Счетчик берем напрямую из размера отфильтрованного списка (это гарантирует точность)
+    local totalFilteredCount = #filtered
+    countLabel.Text = totalFilteredCount .. " pet" .. (totalFilteredCount ~= 1 and "s" or "")
 
-    -- Асинхронно прогружаем и обновляем список
+    -- 4. Рендерим список БЕЗ опасных задержек в цикле
     task.spawn(function()
         for i, entry in ipairs(filtered) do
+            -- Проверка на то, не поменялся ли рендер (оставляем для безопасности)
             if currentRenderId ~= myRenderId then break end
 
             local pet = entry.pet
@@ -986,19 +985,17 @@ function _G.PetMonitorRenderList()
             local card = cardFrames[pet]
 
             if card then
-                -- Пет уже на экране: меняем порядок и обновляем текст (таймер + деньги)
+                -- Пет уже на экране: меняем порядок и обновляем инфу
                 card.LayoutOrder = i
                 updateCardDynamicData(card, data)
             else
-                -- Новый пет: создаем плавно с задержкой 0.2 сек
+                -- Новый пет: создаем МГНОВЕННО, чтобы цикл не оборвался
                 card = createPetCard(pet, data)
                 card.LayoutOrder = i
                 cardFrames[pet] = card
                 
-                shown = shown + 1
-                countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
-                
-                task.wait(0.2)
+                -- Если тебе ОЧЕНЬ нужна плавная анимация появления (например, Tween),
+                -- делай её ВНУТРИ функции createPetCard(pet, data), но не делай task.wait() здесь!
             end
         end
     end)
