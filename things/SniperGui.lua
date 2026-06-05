@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════
--- PET SNIPER v1.0 | LocalScripвввввв
+-- PET SNIPER v1.0 | LocalScriprrrrrr
 -- ══════════════════════════════════════════════════════════════
 
 local Players            = game:GetService("Players")
@@ -84,7 +84,21 @@ if ok and result and result.Items then
             petImages[name] = data.ImageId
         end
     end
-    table.sort(allPetNames)
+    
+    -- Сортировка: сначала по редкости (от худшей к лучшей), а при совпадении — по алфавиту
+    table.sort(allPetNames, function(a, b)
+        local rarityA = (itemConfig[a] and itemConfig[a].Rarity) or "Common"
+        local rarityB = (itemConfig[b] and itemConfig[b].Rarity) or "Common"
+        
+        local orderA = RARITY_ORDER[rarityA] or 99
+        local orderB = RARITY_ORDER[rarityB] or 99
+        
+        if orderA ~= orderB then
+            return orderA < orderB -- Сортируем от меньшего индекса к большему (1 -> 2 -> 3...)
+        else
+            return a < b -- Если редкости одинаковые, сортируем по имени (A -> Z)
+        end
+    end)
 end
 
 -- ══════════════════════════════════════════════════════════════
@@ -447,7 +461,7 @@ local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size              = UDim2.new(1, -10, 1, 0)
 StatusLabel.Position          = UDim2.new(0, 10, 0, 0)
 StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text              = "⏹  Снайпер остановлен"
+StatusLabel.Text              = "⏹  Status: Stopped"
 StatusLabel.TextColor3        = Color3.fromRGB(180, 180, 180)
 StatusLabel.TextSize          = 13
 StatusLabel.Font              = Enum.Font.Gotham
