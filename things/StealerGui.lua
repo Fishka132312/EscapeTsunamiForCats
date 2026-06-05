@@ -1151,65 +1151,89 @@ end
 -- 9. ПОДПИСКА НА ChildAdded / ChildRemoved
 -- ══════════════════════════════════════════════════════════════
 
--- Добавить пета в кэш и перерендерить
+-- ══════════════════════════════════════════════════════════════
+-- ИСПРАВЛЕННЫЙ БЛОК ОТСЛЕЖИВАНИЯ И СИНХРОНИЗАЦИИ ЗОН СПАВНА
+-- ══════════════════════════════════════════════════════════════
+
+-- Добавить пета в кэш и запустить рендер в GUI
 local function onPetAdded(pet, rarityKey)
-    if petCache[pet] then return end   -- уже есть
+    if petCache[pet] then return end   -- Если пет уже в кэше, ничего не делаем
+
+    -- Защита от дефолтных значений: ждем загрузки InfoGUI (максимум 4 секунды)
+    local infoGUI = pet:WaitForChild("InfoGUI", 4)
+    if infoGUI then
+        -- Дополнительно ждем загрузки папки с текстами характеристик пета
+        infoGUI:WaitForChild("TextLabels", 4)
+    else
+        -- Если InfoGUI так и не появился (например, это не пет, а мусорный парт), выходим
+        return 
+    end
+
+    -- Извлекаем чистые данные (теперь они гарантированно заполнены игрой)
     local data = extractPetData(pet, rarityKey)
     petCache[pet] = data
-    _G.PetMonitorRenderList()
+    
+    -- Вызываем глобальный рендер твоего списка
+    if _G.PetMonitorRenderList then
+        _G.PetMonitorRenderList()
+    end
 end
 
--- Удалить пета из кэша и перерендерить
+-- Удалить пета из кэша и обновить интерфейс
 local function onPetRemoved(pet)
     if not petCache[pet] then return end
     petCache[pet] = nil
-    -- Удалить карточку напрямую если есть
+    
+    -- Мгновенно уничтожаем Frame карточки в GUI, если она была создана
     if cardFrames[pet] then
         cardFrames[pet]:Destroy()
         cardFrames[pet] = nil
     end
-    -- Пересчитать счётчик
-    local count = 0
-    for _ in pairs(petCache) do count = count + 1 end
-    countLabel.Text = count .. " pet" .. (count ~= 1 and "s" or "")
+    
+    -- Вызываем полноценный рендер (он сам пересчитает countLabel и сдвинет карточки вверх)
+    if _G.PetMonitorRenderList then
+        _G.PetMonitorRenderList()
+    end
 end
 
--- Слушать изменения в каждой папке редкости
+-- Функция отслеживания конкретной зоны спавна
 local function watchFolder(folder, rarityKey)
-    -- Загружаем уже существующих петов
+    -- Безопасно загружаем петов, которые УЖЕ находятся на этой точке при запуске чита
     for _, pet in ipairs(folder:GetChildren()) do
         task.spawn(onPetAdded, pet, rarityKey)
     end
 
+    -- Слушаем появление новых петов на этой точке
     folder.ChildAdded:Connect(function(pet)
-        -- Небольшая задержка чтобы InfoGUI успел загрузиться
-        task.wait(0.25)
+        -- Даем микро-задержку для инициализации деток внутри модельки
+        task.wait(0.1)
         onPetAdded(pet, rarityKey)
     end)
 
+    -- Слушаем удаление/сбор петов с этой точки
     folder.ChildRemoved:Connect(function(pet)
         onPetRemoved(pet)
     end)
 end
 
--- Подписываемся на ВСЕ зоны спавна (даже если их по 5 штук с одинаковыми именами)
+-- Инициализация: подписываемся на ВСЕ 5+ зон для каждой редкости
 local function initFolderWatchers()
-    -- Получаем абсолютно все объекты внутри ItemSpawners
+    -- Получаем абсолютно все парты/папки внутри ItemSpawners
     local allChildren = ItemSpawners:GetChildren()
     
     for _, child in ipairs(allChildren) do
         local rarKey = child.Name
-        -- Проверяем, входит ли имя объекта в наш список редкостей
+        -- Проверяем, входит ли имя папки в наш список известных редкостей
         if RARITY_ORDER[rarKey] then
-            -- Передаем конкретный парт-зону и его редкость в функцию отслеживания
+            -- Передаем конкретную зону спавна и её редкость в вотчер
             watchFolder(child, rarKey)
         end
     end
 
-    -- Слушатель на случай, если игра динамически создаст новые зоны спавна во время работы
+    -- На случай, если игра динамически создаст новые зоны спавна прямо во время сессии
     ItemSpawners.ChildAdded:Connect(function(newFolder)
         local rarKey = newFolder.Name
-        -- Быстрая проверка: если это зона с известной нам редкостью
+        -- Мгновенная проверка по таблице приоритетов
         if RARITY_ORDER[rarKey] then
             watchFolder(newFolder, rarKey)
         end
