@@ -3,7 +3,8 @@ local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = fal
 
 local scripts = {
     'Troll.lua', 
-	'TrollSell.lua', 
+	'TrollSell.lua',
+	'PVP.lua',
 }
 
 local baseUrl = 'https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/'
@@ -437,6 +438,19 @@ Tab:AddToggle({
         _G.AutoSellEnabled = Value
     end    
 })
+
+local Section = Tab:AddSection({
+	Name = "Total Domination"
+})
+
+Tab:AddToggle({
+	Name = "This is a toggle!",
+	Default = false,
+	Callback = function(Value)
+		_G.PVP = Value
+	end    
+})
+
 --------------------------------MISC-----------------------------
 
 local Tab = Window:MakeTab({
