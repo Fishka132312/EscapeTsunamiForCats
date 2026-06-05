@@ -1,4 +1,4 @@
---[[
+--[[ да
     ╔══════════════════════════════════════════════════════════════════╗
     ║              PET MONITOR — LocalScript v2.0                     ║
     ║  Мониторинг, фильтрация и кража петов в реальном времени        ║
@@ -73,7 +73,6 @@ local RARITY_COLORS = {
     Epic            = Color3.fromRGB(255,  71, 255),
     Legendary       = Color3.fromRGB(255, 162,   0),
     Mythical        = Color3.fromRGB(255, 99,  152),
-    Legendary       = Color3.fromRGB(255, 138,   0),
     OG              = Color3.fromRGB(52,  214,  137),
     SpecialItemSpawn= Color3.fromRGB( 80, 220, 255),
 }
@@ -124,7 +123,6 @@ local activeFilters = {
         Rare            = true,
         Epic            = true,
         Mythical        = true,
-        Mythic          = true,
         Legendary       = true,
         OG              = true,
         SpecialItemSpawn= true,
@@ -1107,68 +1105,6 @@ end
 -- ══════════════════════════════════════════════════════════════
 -- 8. ОБНОВЛЕНИЕ ТАЙМЕРОВ (RunService.Heartbeat)
 -- ══════════════════════════════════════════════════════════════
-
-local currentRenderId = 0
-
-function _G.PetMonitorRenderList()
-    currentRenderId = currentRenderId + 1
-    local myRenderId = currentRenderId
-
-    -- Собираем отфильтрованных и отсортированных петов
-    local filtered = {}
-    local filteredSet = {}
-    
-    for pet, data in pairs(petCache) do
-        if petPassesFilter(data) then
-            table.insert(filtered, { pet = pet, data = data })
-            filteredSet[pet] = true
-        end
-    end
-
-    table.sort(filtered, function(a, b)
-        return getCardSortOrder(a.data) < getCardSortOrder(b.data)
-    end)
-
-    -- Мгновенно удаляем тех, кто скрылся из фильтров
-    for pet, card in pairs(cardFrames) do
-        if not filteredSet[pet] then
-            card:Destroy()
-            cardFrames[pet] = nil
-        end
-    end
-
-    -- Считаем сколько осталось
-    local shown = 0
-    for _ in pairs(cardFrames) do shown = shown + 1 end
-    countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
-
-    -- Асинхронно прогружаем и обновляем список
-    task.spawn(function()
-        for i, entry in ipairs(filtered) do
-            if currentRenderId ~= myRenderId then break end
-
-            local pet = entry.pet
-            local data = entry.data
-            local card = cardFrames[pet]
-
-            if card then
-                -- Пет уже на экране: меняем порядок и обновляем текст (таймер + деньги)
-                card.LayoutOrder = i
-                updateCardDynamicData(card, data)
-            else
-                -- Новый пет: создаем плавно с задержкой 0.2 сек
-                card = createPetCard(pet, data)
-                card.LayoutOrder = i
-                cardFrames[pet] = card
-                
-                shown = shown + 1
-                countLabel.Text = shown .. " pet" .. (shown ~= 1 and "s" or "")
-                
-                task.wait(0.2)
-            end
-        end
-    end)
-end
 
 -- ══════════════════════════════════════════════════════════════
 -- 9. ПОДПИСКА НА ChildAdded / ChildRemoved
