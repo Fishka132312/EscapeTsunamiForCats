@@ -1,10 +1,11 @@
 -- // Переменная для включения/выключения (управляется твоим тоглом)
-_G.PVP = false -- Изначально выключен, пока не активируешь в UI
+_G.PVP = false 
 
 -- // Настройки скрипта
-local DISTANCE_TO_REPULSE = 15 -- Дистанция авто-отвода от врагов
-local TELEPORT_DISTANCE = 100  -- Радиус твоей ТП-атаки
-local REPULSE_POWER = 25       -- Сила отталкивания тебя от врагов
+local BASE_DISTANCE = 16       -- Базовая дистанция авто-отвода
+local TELEPORT_DISTANCE = 100  -- Радиус твоей ТП-Атаки
+local HORIZONTAL_POWER = 35    -- Сила отбрасывания назад (увеличено)
+local VERTICAL_POWER = 40      -- Сила подбрасывания вверх (чтобы скоростные пролетали снизу)
 
 local TARGET_TOOLS = { ["Bat"] = true, ["Slap"] = true }
 
@@ -14,9 +15,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
-
--- // Внутренние переменные контроля конфликтов
-local isAttacking = false -- Флаг атаки (когда true -> авто-отвод полностью изолирован)
+local isAttacking = false 
 
 -- // Функция поиска ближайшего игрока для ТП-атаки
 local function getClosestPlayer(maxDistance)
@@ -41,9 +40,8 @@ local function getClosestPlayer(maxDistance)
     return closestPlayer
 end
 
--- // 1. ЛОГИКА АВТО-ОТВОДА (Защита от чужих ударов)
+-- // 1. УЛУЧШЕННАЯ ЛОГИКА АВТО-ОТВОДА (Анти-спидхак защита)
 RunService.Heartbeat:Connect(function()
-    -- Полный стоп, если выключен тумблер ИЛИ если мы сами прямо сейчас летим атаковать
     if not _G.PVP or isAttacking then return end 
     
     local character = LocalPlayer.Character
@@ -55,7 +53,6 @@ RunService.Heartbeat:Connect(function()
             local enemyChar = player.Character
             local enemyHrp = enemyChar:FindFirstChild("HumanoidRootPart")
             
-            -- Проверяем, экипирован ли у врага опасный тул
             local hasTool = false
             for _, child in ipairs(enemyChar:GetChildren()) do
                 if child:IsA("Tool") and TARGET_TOOLS[child.Name] then
@@ -64,35 +61,43 @@ RunService.Heartbeat:Connect(function()
                 end
             end
             
-            -- Если враг с тулом подошел слишком близко — спасаем свою шкуру
             if hasTool and enemyHrp then
+                -- Считаем скорость врага. Если он бежит слишком быстро, расширяем зону защиты
+                local enemyVelocity = enemyHrp.AssemblyLinearVelocity.Magnitude
+                local dynamicDistance = BASE_DISTANCE
+                if enemyVelocity > 25 then
+                    dynamicDistance = BASE_DISTANCE + (enemyVelocity * 0.15) -- Увеличиваем радиус под быструю цель
+                end
+
                 local direction = (myHrp.Position - enemyHrp.Position)
                 local distance = direction.Magnitude
                 
-                if distance <= DISTANCE_TO_REPULSE then
+                if distance <= dynamicDistance then
                     local pushDir = direction.Unit
-                    if pushDir.X ~= pushDir.X then pushDir = Vector3.new(0, 0, 1) end -- Защита от багов CFrame
+                    if pushDir.X ~= pushDir.X then pushDir = Vector3.new(0, 0, 1) end 
                     
-                    -- Мгновенный сейв-эскейп назад
-                    myHrp.CFrame = myHrp.CFrame + (pushDir * 3) 
-                    myHrp.AssemblyLinearVelocity = pushDir * REPULSE_POWER
+                    -- Убираем Y координату из направления, чтобы чистый горизонтальный вектор шел назад
+                    local flatPushDir = Vector3.new(pushDir.X, 0, pushDir.Z).Unit
+                    
+                    -- Телепортируем немного вверх и назад, чтобы разорвать дистанцию
+                    myHrp.CFrame = myHrp.CFrame + Vector3.new(0, 2, 0) + (flatPushDir * 4)
+                    
+                    -- Задаем импульс: HORIZONTAL_POWER улетает назад, VERTICAL_POWER подкидывает в воздух
+                    myHrp.AssemblyLinearVelocity = (flatPushDir * HORIZONTAL_POWER) + Vector3.new(0, VERTICAL_POWER, 0)
                 end
             end
         end
     end
 end)
 
--- // 2. ЛОГИКА ТЕЛЕПОРТА ЗА СПИНУ ПРИ НАЖАТИИ ЛКМ (Твоя атака)
+-- // 2. ЛОГИКА ТЕЛЕПОРТА ЗА СПИНУ ПРИ НАЖАТИИ ЛКМ 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    -- Если печатаешь в чате или тумблер выключен — игнорим клики
     if gameProcessed or not _G.PVP then return end
     
-    -- Реагируем на Левую Кнопку Мыши
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         local character = LocalPlayer.Character
         if not character or not character:FindFirstChild("HumanoidRootPart") then return end
         
-        -- Проверяем, держишь ли ТЫ в руках Bat или Slap
         local holdingValidTool = false
         for _, child in ipairs(character:GetChildren()) do
             if child:IsA("Tool") and TARGET_TOOLS[child.Name] then
@@ -101,7 +106,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
             end
         end
         
-        -- Если ты готов к бою, ищем цель в радиусе 100 студов
         if holdingValidTool then
             local targetPlayer = getClosestPlayer(TELEPORT_DISTANCE)
             
@@ -109,28 +113,153 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 local myHrp = character.HumanoidRootPart
                 local enemyHrp = targetPlayer.Character.HumanoidRootPart
                 
-                -- ЖЕСТКИЙ БЛОК АВТО-ОТВОДА: теперь враг нас не оттолкнет во время нашего ТП
                 isAttacking = true
                 
-                -- Запоминаем точку, откуда прилетели
                 local oldCFrame = myHrp.CFrame
                 
-                -- Высчитываем позицию строго ЗА спиной чела (на расстоянии 2.5 студов для стопроцентного хита)
-                -- И разворачиваем наше лицо (LookVector) в сторону его спины/головы
-                local backPosition = enemyHrp.Position - (enemyHrp.CFrame.LookVector * 2.5)
+                -- Появление четко за спиной на расстоянии 2.3 студа (еще ближе для точности)
+                local backPosition = enemyHrp.Position - (enemyHrp.CFrame.LookVector * 2.3)
                 local targetCFrame = CFrame.new(backPosition, enemyHrp.Position)
                 
-                -- Влетаем со спины
                 myHrp.CFrame = targetCFrame
                 
-                -- Задержка в 0.25 сек. Пока идет задержка, скрипт игнорирует отбрасывание,
-                -- твоя игра успевает нанести урон, и анимация засчитывает удар.
-                task.wait(0.25)
+                task.wait(0.22) -- Чуть уменьшил задержку, чтобы удар проходил молниеносно
                 
-                -- Безопасно возвращаемся назад, откуда пришли
                 myHrp.CFrame = oldCFrame
                 
-                -- Включаем авто-отвод обратно в штатный режим
+                isAttacking = false
+            end
+        end
+    end
+end)-- // Переменная для включения/выключения (управляется твоим тоглом)
+_G.PVP = false 
+
+-- // Настройки скрипта
+local BASE_DISTANCE = 16       -- Базовая дистанция авто-отвода
+local TELEPORT_DISTANCE = 100  -- Радиус твоей ТП-Атаки
+local HORIZONTAL_POWER = 35    -- Сила отбрасывания назад (увеличено)
+local VERTICAL_POWER = 40      -- Сила подбрасывания вверх (чтобы скоростные пролетали снизу)
+
+local TARGET_TOOLS = { ["Bat"] = true, ["Slap"] = true }
+
+-- // Сервисы Roblox
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local isAttacking = false 
+
+-- // Функция поиска ближайшего игрока для ТП-атаки
+local function getClosestPlayer(maxDistance)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return nil end
+    
+    local myHrp = character.HumanoidRootPart
+    local closestPlayer = nil
+    local shortestDistance = maxDistance
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local enemyHrp = player.Character.HumanoidRootPart
+            local distance = (myHrp.Position - enemyHrp.Position).Magnitude
+            
+            if distance < shortestDistance then
+                shortestDistance = distance
+                closestPlayer = player
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- // 1. УЛУЧШЕННАЯ ЛОГИКА АВТО-ОТВОДА (Анти-спидхак защита)
+RunService.Heartbeat:Connect(function()
+    if not _G.PVP or isAttacking then return end 
+    
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local myHrp = character.HumanoidRootPart
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local enemyChar = player.Character
+            local enemyHrp = enemyChar:FindFirstChild("HumanoidRootPart")
+            
+            local hasTool = false
+            for _, child in ipairs(enemyChar:GetChildren()) do
+                if child:IsA("Tool") and TARGET_TOOLS[child.Name] then
+                    hasTool = true
+                    break
+                end
+            end
+            
+            if hasTool and enemyHrp then
+                -- Считаем скорость врага. Если он бежит слишком быстро, расширяем зону защиты
+                local enemyVelocity = enemyHrp.AssemblyLinearVelocity.Magnitude
+                local dynamicDistance = BASE_DISTANCE
+                if enemyVelocity > 25 then
+                    dynamicDistance = BASE_DISTANCE + (enemyVelocity * 0.15) -- Увеличиваем радиус под быструю цель
+                end
+
+                local direction = (myHrp.Position - enemyHrp.Position)
+                local distance = direction.Magnitude
+                
+                if distance <= dynamicDistance then
+                    local pushDir = direction.Unit
+                    if pushDir.X ~= pushDir.X then pushDir = Vector3.new(0, 0, 1) end 
+                    
+                    -- Убираем Y координату из направления, чтобы чистый горизонтальный вектор шел назад
+                    local flatPushDir = Vector3.new(pushDir.X, 0, pushDir.Z).Unit
+                    
+                    -- Телепортируем немного вверх и назад, чтобы разорвать дистанцию
+                    myHrp.CFrame = myHrp.CFrame + Vector3.new(0, 2, 0) + (flatPushDir * 4)
+                    
+                    -- Задаем импульс: HORIZONTAL_POWER улетает назад, VERTICAL_POWER подкидывает в воздух
+                    myHrp.AssemblyLinearVelocity = (flatPushDir * HORIZONTAL_POWER) + Vector3.new(0, VERTICAL_POWER, 0)
+                end
+            end
+        end
+    end
+end)
+
+-- // 2. ЛОГИКА ТЕЛЕПОРТА ЗА СПИНУ ПРИ НАЖАТИИ ЛКМ 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or not _G.PVP then return end
+    
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local character = LocalPlayer.Character
+        if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+        
+        local holdingValidTool = false
+        for _, child in ipairs(character:GetChildren()) do
+            if child:IsA("Tool") and TARGET_TOOLS[child.Name] then
+                holdingValidTool = true
+                break
+            end
+        end
+        
+        if holdingValidTool then
+            local targetPlayer = getClosestPlayer(TELEPORT_DISTANCE)
+            
+            if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local myHrp = character.HumanoidRootPart
+                local enemyHrp = targetPlayer.Character.HumanoidRootPart
+                
+                isAttacking = true
+                
+                local oldCFrame = myHrp.CFrame
+                
+                -- Появление четко за спиной на расстоянии 2.3 студа (еще ближе для точности)
+                local backPosition = enemyHrp.Position - (enemyHrp.CFrame.LookVector * 2.3)
+                local targetCFrame = CFrame.new(backPosition, enemyHrp.Position)
+                
+                myHrp.CFrame = targetCFrame
+                
+                task.wait(0.22) -- Чуть уменьшил задержку, чтобы удар проходил молниеносно
+                
+                myHrp.CFrame = oldCFrame
+                
                 isAttacking = false
             end
         end
