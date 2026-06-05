@@ -1,7 +1,7 @@
---[[ да2
+--[[ да3
     ╔══════════════════════════════════════════════════════════════════╗
-    ║              PET MONITOR — LocalScript v2.0                     ║
-    ║  Мониторинг, фильтрация и кража петов в реальном времени        ║
+    ║              PET MONITOR — LocalScript v2.0                      ║
+    ║  Мониторинг, фильтрация и кража петов в реальном времени         ║
     ╚══════════════════════════════════════════════════════════════════╝
 
     СТРУКТУРА:
@@ -950,16 +950,21 @@ function _G.PetMonitorRenderList()
     local myRenderId = currentRenderId
 
     -- ══════════════════════════════════════════════════════════════
-    -- ФОРСИРОВАННЫЙ СБОР ВСЕХ ПЕТОВ С КАРТЫ (ДЛЯ МГНОВЕННОГО ОБНОВЛЕНИЯ)
+    -- ЕЖЕСЕКУНДНЫЙ ПРАЙС-ЧЕК: СБОР И ОБНОВЛЕНИЕ ДАННЫХ С КАРТЫ
     -- ══════════════════════════════════════════════════════════════
     local allZones = ItemSpawners:GetChildren()
     for _, zone in ipairs(allZones) do
         local rarKey = zone.Name
         if RARITY_ORDER[rarKey] then
             for _, pet in ipairs(zone:GetChildren()) do
+                -- Если пета вообще нет в кэше и у него догрузился InfoGUI — добавляем
                 if not petCache[pet] and pet:FindFirstChild("InfoGUI") then
                     local data = extractPetData(pet, rarKey)
                     petCache[pet] = data
+                -- Если пет УЖЕ есть в кэше, мы всё равно обновляем его данные (таймер/цену) каждую секунду!
+                elseif petCache[pet] and pet:FindFirstChild("InfoGUI") then
+                    local freshData = extractPetData(pet, rarKey)
+                    petCache[pet] = freshData
                 end
             end
         end
@@ -970,27 +975,24 @@ function _G.PetMonitorRenderList()
     local filteredSet = {}
     
     for pet, data in pairs(petCache) do
+        -- Проверяем, существует ли пет физически в игре и проходит ли по фильтрам (например, только OG)
         if pet and pet.Parent and petPassesFilter(data) then
-            -- Считываем свежий таймер/деньги прямо из InfoGUI перед отрисовкой
-            local freshData = extractPetData(pet, data.rarityKey)
-            petCache[pet] = freshData -- сохраняем обновленные данные в кэш
-            
-            table.insert(filtered, { pet = pet, data = freshData })
+            table.insert(filtered, { pet = pet, data = data })
             filteredSet[pet] = true
         else
-            -- Если пета удалили или его забрали, чистим кэш
+            -- Если пета удалили (забрали), чистим кэш
             if not pet or not pet.Parent then
                 petCache[pet] = nil
             end
         end
     end
 
-    -- Сортируем по приоритетам (редкости и мутации)
+    -- Сортируем отфильтрованный список по приоритетам (редкости и мутации)
     table.sort(filtered, function(a, b)
         return getCardSortOrder(a.data) < getCardSortOrder(b.data)
     end)
 
-    -- 2. Мгновенно удаляем тех, кто скрылся из фильтров
+    -- 2. Мгновенно удаляем карточки тех, кто скрылся из фильтров или исчез с карты
     for pet, card in pairs(cardFrames) do
         if not filteredSet[pet] then
             card:Destroy()
@@ -998,13 +1000,14 @@ function _G.PetMonitorRenderList()
         end
     end
 
-    -- 3. Счетчик берем напрямую из размера отфильтрованного списка
+    -- 3. Счетчик берем напрямую из размера текущего отфильтрованного списка
     local totalFilteredCount = #filtered
     countLabel.Text = totalFilteredCount .. " pet" .. (totalFilteredCount ~= 1 and "s" or "")
 
-    -- 4. Рендерим список МГНОВЕННО и без задержек в цикле
+    -- 4. Рендерим список МГНОВЕННО и обновляем GUI
     task.spawn(function()
         for i, entry in ipairs(filtered) do
+            -- Если за эту миллисекунду прилетел новый запрос на рендер — плавно выходим
             if currentRenderId ~= myRenderId then break end
 
             local pet = entry.pet
@@ -1012,11 +1015,11 @@ function _G.PetMonitorRenderList()
             local card = cardFrames[pet]
 
             if card then
-                -- Пет уже на экране: меняем порядок и обновляем динамические данные (таймер, деньги)
+                -- Пет уже на экране: обновляем его позицию в сетке и ПУШИМ свежий таймер/цену
                 card.LayoutOrder = i
                 updateCardDynamicData(card, data)
             else
-                -- Новая карточка: создаем МГНОВЕННО
+                -- Новая карточка (если появился новый пет нужного фильтра): создаем МГНОВЕННО
                 card = createPetCard(pet, data)
                 card.LayoutOrder = i
                 cardFrames[pet] = card
@@ -1025,49 +1028,18 @@ function _G.PetMonitorRenderList()
     end)
 
     -- ══════════════════════════════════════════════════════════════
-    -- СЕКУНДНЫЙ АВТО-ОБНОВИТЕЛЬ С ЖЕСТКИМ ПЕРЕДЕРГИВАНИЕМ ТЕКСТА
+    -- ПОСТОЯННЫЙ ФОНОВЫЙ ЦИКЛ ОБНОВЛЕНИЯ (ПРАЙС-ЧЕК РАЗ В СЕКУНДУ)
     -- ══════════════════════════════════════════════════════════════
     if not isLoopRunning then
         isLoopRunning = true
         task.spawn(function()
             while true do
-                task.wait(1.0) -- Ждем ровно 1 секунду
+                task.wait(1.0) -- Ровно раз в секунду
                 
-                -- Проверяем, не появились ли новые петы динамически
-                local checkZones = ItemSpawners:GetChildren()
-                local foundNewPet = false
-                
-                for _, zone in ipairs(checkZones) do
-                    if RARITY_ORDER[zone.Name] then
-                        for _, pet in ipairs(zone:GetChildren()) do
-                            if not petCache[pet] and pet:FindFirstChild("InfoGUI") then
-                                foundNewPet = true
-                                break
-                            end
-                        end
-                    end
-                end
-                
-                if foundNewPet then
-                    -- Если спавнился абсолютно новый пет — делаем тяжелый полный рендер списка
-                    _G.PetMonitorRenderList()
-                else
-                    -- Если состав стабилен — НАПРЯМУЮ обновляем тексты таймеров на карточках
-                    for pet, card in pairs(cardFrames) do
-                        if pet and pet.Parent and petCache[pet] then
-                            -- Извлекаем новые данные из игры секунду спустя
-                            local newestData = extractPetData(pet, petCache[pet].rarityKey)
-                            petCache[pet] = newestData
-                            
-                            -- ПРИНУДИТЕЛЬНО пушим новое время в лейблы карточки в GUI
-                            updateCardDynamicData(card, newestData)
-                        else
-                            -- Если пет пропал с карты (собрали) — сбрасываем список
-                            _G.PetMonitorRenderList()
-                            break
-                        end
-                    end
-                end
+                -- Вызываем этот же рендер. Теперь он гарантированно обновляет данные 
+                -- даже для тех петов, которые сейчас отфильтрованы и скрыты, 
+                -- а для активных (например, OG) — обновляет таймеры прямо на экране.
+                _G.PetMonitorRenderList()
             end
         end)
     end
