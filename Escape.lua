@@ -2,8 +2,8 @@ local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jen
 local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = false, SaveConfig = true, ConfigFolder = "StealAPushin"})
 
 local scripts = {
-    'PVP.lua', 
-	'Troll.lua',
+    'Troll.lua', 
+	'PVP.lua',
 }
 
 local baseUrl = 'https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/'
@@ -100,6 +100,13 @@ Tab:AddButton({
     Name = "Monitoring pets",
     Callback = function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/StealerGui.lua'))()
+    end    
+})
+
+Tab:AddButton({
+    Name = "Inventory Checker",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/InventoryChecker.lua'))()
     end    
 })
 
