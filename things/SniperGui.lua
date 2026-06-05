@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════
--- PET SNIPER v1.0 | LocalScriptфвфвф
+-- PET SNIPER v1.0 | LocalScriptфффф
 -- ══════════════════════════════════════════════════════════════
 
 local Players            = game:GetService("Players")
@@ -191,7 +191,7 @@ local function teleportToSafeZone()
         print("[Sniper] Рюкзак забит. Разгрузка в SafeZone...")
         HumanoidRootPart.CFrame = CFrame.new(getSafeZonePosition())
         task.wait(1.5) -- Ждем, чтобы игра успела забрать петов и очистить инвентарь
-        gatheredCount = 0 -- Обнуляем счётчик
+        gatheredCount = 0 -- Обнуляем счётчик строго НА БАЗЕ
     end)
 end
 
@@ -214,8 +214,8 @@ local function stealPet(pet, petData)
         end
         task.wait(STEAL_TELEPORT_WAIT)
 
-        -- 2. Активация ProximityPrompt
-        if petData and petData.prompt and petData.prompt:IsDescendantOf(workspace) then
+        -- 2. Активация ProximityPrompt (проверяем, жив ли еще пет в игре)
+        if pet and pet:IsDescendantOf(workspace) and petData and petData.prompt and petData.prompt:IsDescendantOf(workspace) then
             task.wait(STEAL_PROMPT_WAIT)
             fireproximityprompt(petData.prompt)
             
@@ -225,13 +225,13 @@ local function stealPet(pet, petData)
 
         task.wait(STEAL_RETURN_WAIT)
 
-        -- 3. Проверка лимита: если забились, СРАЗУ летим на базу
+        -- 3. Проверка лимита: если забились, летим на базу НЕ ВЫХОДЯ ИЗ ИСПОЛНЕНИЯ (флаг isStealing еще true!)
         if gatheredCount >= maxCarry then
             teleportToSafeZone()
         end
     end)
 
-    isStealing = false
+    isStealing = false -- Освобождаем скрипт только в самом конце
 end
 
 -- Проверяем, подходит ли пет под фильтры
@@ -253,8 +253,8 @@ local function scanAndSnipe()
         local targetFound = false
         local maxCarry = getCurrentCarryLimit()
 
-        -- Проверка перед циклом: если забились в другом потоке, сначала чистим инвентарь
-        if gatheredCount >= maxCarry then
+        -- Если счетчик почему-то переполнился вне функции кражи, разгружаемся один раз аккуратно
+        if gatheredCount >= maxCarry and not isStealing then
             isStealing = true
             teleportToSafeZone()
             isStealing = false
@@ -312,7 +312,7 @@ local function connectSpawners()
                             if gatheredCount < maxCarry then
                                 stealPet(pet, petData)
                             else
-                                -- Если места нет, просто отправляем на разгрузку
+                                -- Если места нет и мы НЕ крадем прямо сейчас, отправляем на разгрузку
                                 if not isStealing then
                                     isStealing = true
                                     teleportToSafeZone()
