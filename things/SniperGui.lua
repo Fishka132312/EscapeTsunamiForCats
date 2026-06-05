@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════
--- PET SNIPER v1.0 | LocalScript вф
+-- PET SNIPER v1.0 | LocalScriptфвфвф
 -- ══════════════════════════════════════════════════════════════
 
 local Players            = game:GetService("Players")
@@ -155,47 +155,38 @@ local function stealPet(pet, petData)
     if isStealing then return end
     isStealing = true
 
-    -- Безопасно получаем персонажа БЕЗ вечного ожидания CharacterAdded:Wait()
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    -- Обернули в pcall: если что-то пойдет не так (персонаж умрет или пет исчезнет),
+    -- скрипт не сломается, а isStealing гарантированно сбросится в false
+    pcall(function()
+        -- Обновляем Character (мог респавниться)
+        Character       = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
 
-    -- Если персонаж или HRP не найдены, сразу сбрасываем флаг кражи и выходим
-    if not hrp then 
-        isStealing = false 
-        return 
-    end
-
-    -- Оборачиваем весь процесс в pcall, чтобы при любой ошибке (если пет пропал) скрипт не зависал
-    local success, err = pcall(function()
         -- 1. Телепорт к пету
-        if petData.headPart and petData.headPart.Parent then
-            hrp.CFrame = petData.headPart.CFrame + Vector3.new(0, 2, 0)
-        else
-            return
+        if petData and petData.headPart and petData.headPart:IsDescendantOf(workspace) then
+            HumanoidRootPart.CFrame = petData.headPart.CFrame + Vector3.new(0, 2, 0)
         end
         task.wait(STEAL_TELEPORT_WAIT)
 
-        -- 2. Активация ProximityPrompt
-        if petData.prompt and petData.prompt.Parent then
+        -- 2. FireProximityPrompt
+        if petData and petData.prompt and petData.prompt:IsDescendantOf(workspace) then
             task.wait(STEAL_PROMPT_WAIT)
             fireproximityprompt(petData.prompt)
         end
 
         task.wait(STEAL_RETURN_WAIT)
+
+        -- 3. Телепорт в SafeZone
+        HumanoidRootPart.CFrame = CFrame.new(getSafeZonePosition())
     end)
 
-    -- Гарантированно открываем "замок" для следующего пета, даже если была ошибка
-    isStealing = false 
-
-    -- 3. Телепорт в SafeZone (проверяем HRP заново на случай, если персонаж обновился)
-    local refreshChar = LocalPlayer.Character
-    local refreshHrp = refreshChar and refreshChar:FindFirstChild("HumanoidRootPart")
-    if refreshHrp then
-        refreshHrp.CFrame = CFrame.new(getSafeZonePosition())
-    end
+    isStealing = false
 end
+
 -- Проверяем, подходит ли пет под фильтры
 local function petMatchesFilters(petData)
+    if not petData then return false end
+    
     -- Проверка имени
     if not snipeAllPets then
         if not selectedPets[petData.name] then return false end
@@ -207,25 +198,32 @@ local function petMatchesFilters(petData)
     return true
 end
 
--- Сканируем все папки ItemSpawners
+-- Бесконечно сканируем все папки, пока активен снайпер
 local function scanAndSnipe()
-    -- ЕСЛИ МЫ УЖЕ ЧТО-ТО КРАДЕМ, ПРЕКРАЩАЕМ СКАН, ПОКА НЕ ЗАКОНЧИМ!
-    if isStealing then return end 
+    while sniperActive do
+        local targetFound = false
 
-    for _, folderName in ipairs(RARITY_FOLDERS) do
-        local folder = ItemSpawners:FindFirstChild(folderName)
-        if folder then
-            for _, pet in ipairs(folder:GetChildren()) do
-                if pet:IsA("Model") then
-                    local petData = extractPetData(pet, folderName)
-                    -- Проверяем еще раз флаг на случай, если он изменился внутри цикла
-                    if petMatchesFilters(petData) and not isStealing then
-                        stealPet(pet, petData)
-                        return  -- один за раз
+        for _, folderName in ipairs(RARITY_FOLDERS) do
+            local folder = ItemSpawners:FindFirstChild(folderName)
+            if folder then
+                for _, pet in ipairs(folder:GetChildren()) do
+                    if pet:IsA("Model") then
+                        local petData = extractPetData(pet, folderName)
+                        
+                        -- Проверяем фильтры и не заняты ли мы сейчас кражей
+                        if petMatchesFilters(petData) and not isStealing then
+                            targetFound = true
+                            stealPet(pet, petData)
+                            break -- Прерываем внутренний цикл, чтобы обновить позицию персонажа
+                        end
                     end
                 end
             end
+            if targetFound then break end
         end
+        
+        -- Небольшая пауза между сканированиями карты, чтобы не лагал интерфейс и игра
+        task.wait(0.5) 
     end
 end
 
@@ -242,10 +240,21 @@ local function connectSpawners()
             local conn = folder.ChildAdded:Connect(function(pet)
                 if not sniperActive then return end
                 task.wait(0.1)  -- ждём пока InfoGUI прогрузится
+                
                 if pet:IsA("Model") then
                     local petData = extractPetData(pet, folderName)
                     if petMatchesFilters(petData) then
-                        stealPet(pet, petData)
+                        -- Запуск в отдельном потоке (task.spawn), чтобы не блокировать ChildAdded
+                        task.spawn(function()
+                            -- Если в этот момент скрипт уже что-то крадет, ждем своей очереди (макс 5 секунд)
+                            local timeout = 0
+                            while isStealing and timeout < 5 do
+                                task.wait(0.1)
+                                timeout = timeout + 0.1
+                            end
+                            -- Когда освободились — забираем пета
+                            stealPet(pet, petData)
+                        end)
                     end
                 end
             end)
@@ -919,49 +928,43 @@ local function updateStartBtn()
 end
 
 StartBtn.MouseButton1Click:Connect(function()
-    -- Проверяем что выбран хотя бы один пет [cite: 68]
-    local hasPet = snipeAllPets [cite: 70]
-    if not hasPet then [cite: 70]
-        for _, v in pairs(selectedPets) do [cite: 71]
-            if v then hasPet = true break end [cite: 71]
-        end [cite: 71]
-    end [cite: 71]
+    -- Проверяем что выбран хотя бы один пет
+    local hasPet = snipeAllPets
+    if not hasPet then
+        for _, v in pairs(selectedPets) do
+            if v then hasPet = true break end
+        end
+    end
 
-    if not hasPet then [cite: 71]
-        StatusLabel.Text       = "⚠️  Выбери хотя бы одного пета!" [cite: 71]
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50) [cite: 71]
-        return [cite: 71]
-    end [cite: 71]
+    if not hasPet then
+        StatusLabel.Text       = "⚠️  Выбери хотя бы одного пета!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
+        return
+    end
 
-    local hasMut = snipeAllMutations [cite: 71]
-    if not hasMut then [cite: 71]
-        for _, v in pairs(selectedMutations) do [cite: 72]
-            if v then hasMut = true break end [cite: 72]
-        end [cite: 72]
-    end [cite: 72]
+    local hasMut = snipeAllMutations
+    if not hasMut then
+        for _, v in pairs(selectedMutations) do
+            if v then hasMut = true break end
+        end
+    end
 
-    if not hasMut then [cite: 72]
-        StatusLabel.Text       = "⚠️  Выбери хотя бы одну мутацию!" [cite: 72]
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50) [cite: 72]
-        return [cite: 72]
-    end [cite: 72]
+    if not hasMut then
+        StatusLabel.Text       = "⚠️  Выбери хотя бы одну мутацию!"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
+        return
+    end
 
-    sniperActive = not sniperActive [cite: 72]
-    updateStartBtn() [cite: 73]
+    sniperActive = not sniperActive
+    updateStartBtn()
 
-    if sniperActive then [cite: 73]
-        connectSpawners() [cite: 73]
-        
-        -- Включаем бесконечный фоновый цикл проверки карты, пока снайпер активен
-        task.spawn(function()
-            while sniperActive do
-                scanAndSnipe()
-                task.wait(0.5) -- Проверяем локацию на наличие петов каждые полсекунды
-            end
-        end)
+    if sniperActive then
+        connectSpawners()
+        -- Также проверяем уже существующих петов
+        task.spawn(scanAndSnipe)
     else
-        for _, conn in ipairs(connections) do conn:Disconnect() end [cite: 73]
-        connections = {} [cite: 73]
+        for _, conn in ipairs(connections) do conn:Disconnect() end
+        connections = {}
     end
 end)
 
