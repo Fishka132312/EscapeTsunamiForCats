@@ -1,8 +1,9 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))() --dada
 local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = false, SaveConfig = true, ConfigFolder = "StealAPushin"})
 
 local scripts = {
     'Troll.lua', 
+	'TrollSell.lua', 
 }
 
 local baseUrl = 'https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/'
@@ -33,6 +34,10 @@ local Tab = Window:MakeTab({
 	Icon = "rbxassetid://4483345998",
 	PremiumOnly = false
 }) 
+
+local Section = Tab:AddSection({
+	Name = "Main"
+})
 
 
 Tab:AddButton({
@@ -89,6 +94,10 @@ local Tab = Window:MakeTab({
 	PremiumOnly = false
 })
 
+local Section = Tab:AddSection({
+	Name = "Free brat"
+})
+
 Tab:AddButton({
     Name = "Free Vip!",
     Callback = function()
@@ -123,6 +132,10 @@ local Tab = Window:MakeTab({
 	Name = "Dupe Pets",
 	Icon = "rbxassetid://4483345998",
 	PremiumOnly = false
+})
+
+local Section = Tab:AddSection({
+	Name = "Dupe Pets"
 })
 
 Tab:AddButton({
@@ -297,6 +310,9 @@ local Tab = Window:MakeTab({
 	PremiumOnly = false
 })
 
+local Section = Tab:AddSection({
+	Name = "Speed"
+})
 
 Tab:AddToggle({
     Name = "Auto Purchase Speed",
@@ -316,6 +332,10 @@ Tab:AddToggle({
     end    
 })
 
+local Section = Tab:AddSection({
+	Name = "Rebirths"
+})
+
 Tab:AddToggle({
     Name = "Auto Purchase Rebirth",
     Default = false,
@@ -333,6 +353,10 @@ Tab:AddToggle({
     end    
 })
 
+local Section = Tab:AddSection({
+	Name = "Other"
+})
+
 Tab:AddToggle({
     Name = "Remove Annoying Notifications",
     Default = false,
@@ -346,6 +370,10 @@ local Tab = Window:MakeTab({
 	Icon = "rbxassetid://4483345998",
 	PremiumOnly = false
 }) 
+
+local Section = Tab:AddSection({
+	Name = "Spam Gift Pets"
+})
 
 -- Глобальные переменные для связи интерфейса с основным скриптом
 _G.SelectedPlayer = nil
@@ -395,11 +423,18 @@ Tab:AddToggle({
     Default = false,
     Callback = function(Value)
         _G.AutoGiftEnabled = Value
-        if _G.AutoGiftEnabled then
-            print("[UI] Авто-фарм и дарение: ВКЛЮЧЕНО. Цель:", tostring(_G.SelectedPlayer))
-        else
-            print("[UI] Авто-фарм и дарение: ВЫКЛЮЧЕНО.")
-        end
+    end    
+})
+
+local Section = Tab:AddSection({
+	Name = "Spam Sell"
+})
+
+Tab:AddToggle({
+    Name = "Start Sell/Steal",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoSellEnabled = Value
     end    
 })
 --------------------------------MISC-----------------------------
