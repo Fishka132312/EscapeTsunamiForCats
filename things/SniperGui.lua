@@ -68,6 +68,7 @@ local STEAL_RETURN_WAIT   = 0.5
 
 local itemConfig = nil
 local allPetNames = {}  -- список всех имён петов из конфига
+local petImages = {}
 
 local ok, result = pcall(function()
     return require(ReplicatedStorage.Modules.ItemConfigurations)
@@ -75,8 +76,13 @@ end)
 
 if ok and result and result.Items then
     itemConfig = result.Items
-    for name, _ in pairs(itemConfig) do
+    for name, data in pairs(itemConfig) do
         table.insert(allPetNames, name)
+        
+        -- Сохраняем картинку для каждого пета, если она есть в модуле
+        if data and data.ImageId then
+            petImages[name] = data.ImageId
+        end
     end
     table.sort(allPetNames)
 end
@@ -407,7 +413,7 @@ local CloseBtn = Instance.new("TextButton")
 CloseBtn.Size             = UDim2.new(0, 30, 0, 30)
 CloseBtn.Position         = UDim2.new(1, -38, 0, 5)
 CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-CloseBtn.Text             = "✕"
+CloseBtn.Text             = "X"
 CloseBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
 CloseBtn.TextSize         = 14
 CloseBtn.Font             = Enum.Font.GothamBold
@@ -625,10 +631,18 @@ local function createPetButton(petName)
     barCorner.CornerRadius = UDim.new(0, 2)
     barCorner.Parent = rarityBar
 
-    -- Имя пета
+    -- Картинка пета
+    local petImage = Instance.new("ImageLabel")
+    petImage.Size = UDim2.new(0, 22, 0, 22)
+    petImage.Position = UDim2.new(0, 10, 0.5, -11) -- Центрирование по вертикали
+    petImage.BackgroundTransparency = 1
+    petImage.Image = petImages[petName] or "rbxassetid://0" -- Берем ID из созданной таблицы
+    petImage.Parent = btn
+
+    -- Имя пета (Сдвинуто на 38px вправо, чтобы освободить место под иконку)
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size              = UDim2.new(1, -50, 1, 0)
-    nameLabel.Position          = UDim2.new(0, 12, 0, 0)
+    nameLabel.Size              = UDim2.new(1, -150, 1, 0) -- Сузили, чтобы имя не налезало на текст редкости
+    nameLabel.Position          = UDim2.new(0, 38, 0, 0)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text              = petName
     nameLabel.TextColor3        = Color3.fromRGB(220, 220, 220)
@@ -641,7 +655,7 @@ local function createPetButton(petName)
     -- Редкость справа
     local rarityLabel = Instance.new("TextLabel")
     rarityLabel.Size              = UDim2.new(0, 80, 1, 0)
-    rarityLabel.Position          = UDim2.new(1, -85, 0, 0)
+    rarityLabel.Position          = UDim2.new(1, -110, 0, 0) -- Сдвинуто левее, чтобы не врезаться в чекбокс
     rarityLabel.BackgroundTransparency = 1
     rarityLabel.Text              = rarity
     rarityLabel.TextColor3        = rarityColor
