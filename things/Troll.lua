@@ -52,17 +52,23 @@ local function getAvailablePets()
     for _, rarityFolder in ipairs(ItemSpawners:GetChildren()) do
         -- Проверяем, включена ли эта редкость в настройках TARGET_RARITIES
         if TARGET_RARITIES[rarityFolder.Name] then
-            -- Если папка подходит, собираем из неё всех петов
-            for _, pet in ipairs(rarityFolder:GetChildren()) do
-                local head = pet:FindFirstChild("Head")
-                local prompt = head and head:FindFirstChildOfClass("ProximityPrompt")
-                
-                if head and prompt then
-                    table.insert(validPets, { 
-                        Item = pet, 
-                        Head = head, 
-                        Prompt = prompt 
-                    })
+            local children = rarityFolder:GetChildren()
+            
+            -- Проверяем, есть ли вообще смысл перебирать (нужно минимум 2 пета, чтобы 1 оставить)
+            if #children > 1 then
+                -- Начинаем со 2-го пета, первый ВСЕГДА игнорируется и остается на локации
+                for i = 2, #children do
+                    local pet = children[i]
+                    local head = pet:FindFirstChild("Head")
+                    local prompt = head and head:FindFirstChildOfClass("ProximityPrompt")
+                    
+                    if head and prompt then
+                        table.insert(validPets, { 
+                            Item = pet, 
+                            Head = head, 
+                            Prompt = prompt 
+                        })
+                    end
                 end
             end
         end
