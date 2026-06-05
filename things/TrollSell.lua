@@ -6,7 +6,7 @@ local LocalPlayer     = Players.LocalPlayer
 local ItemSpawners    = Workspace:WaitForChild("ItemSpawners")
 local SellRemote      = ReplicatedStorage:WaitForChild("Events"):WaitForChild("RequestSell")
 
--- Настройки фильтра редкостей (добавлены все основные, какие тебе нужны)
+-- Настройки фильтра редкостей
 local TARGET_RARITIES = {
     ["Common"] = true,
     ["Uncommon"] = true,
@@ -18,10 +18,13 @@ local TARGET_RARITIES = {
     ["SpecialItemSpawn"] = true
 }
 
--- Тайминги
-local DELAY_AFTER_TP = 0.15   -- Задержка после телепорта к пету
-local DELAY_PROMPT   = 0.1   -- Задержка промпта
-local DELAY_AFTER_SELL = 0.1  -- Пауза после продажи перед новым кругом
+-- Тайминги (чуть увеличили для стабильности детекта промптов)
+local DELAY_AFTER_TP   = 0.25  -- Задержка после телепорта к пету (чтобы игра поняла, что ты там)
+local DELAY_PROMPT     = 0.15  -- Задержка зажатия промпта
+local DELAY_AFTER_SELL = 0.5   -- Пауза после продажи, чтобы инвентарь успел очиститься
+
+-- Переменная для хранения настоящей сейфзоны
+local safeZoneCFrame = nil
 
 -- Функция получения лимита вместимости из твоего UI
 local function getCurrentCarryLimit()
@@ -51,14 +54,13 @@ end
 local function getAvailablePetsWithLimit()
     local validPets = {}
     
-    -- Сканируем все папки внутри ItemSpawners
     for _, rarityFolder in ipairs(ItemSpawners:GetChildren()) do
         if TARGET_RARITIES[rarityFolder.Name] then
             local allChildren = rarityFolder:GetChildren()
             
-            -- Если в папке больше 1 пета, мы можем собирать их, оставляя последний 1
+            -- Проверяем, что в папке больше одного объекта
             if #allChildren > 1 then
-                -- Пробегаемся по петрам, но не трогаем самого последнего (индекс 1)
+                -- Игнорируем индекс 1, собираем со 2-го и дальше
                 for i = 2, #allChildren do
                     local pet = allChildren[i]
                     local head = pet:FindFirstChild("Head")
@@ -88,18 +90,22 @@ local function firePrompt(prompt)
     end
 end
 
-print("[Core Sell] Фоновый скрипт авто-продажи запущен!")
+print("[Core Sell] Фоновый скрипт авто-продажи запущен и готов!")
 
 while true do
-    task.wait(0.5) -- Защита от лагов, пока тумблер выключен
+    task.wait(0.3) -- Снизили задержку проверки кнопки
     
     if _G.AutoSellEnabled then
         local Character = LocalPlayer.Character
         local HumanoidRootPart = Character and Character:FindFirstChild("HumanoidRootPart")
         
         if HumanoidRootPart then
-            -- 1. Запоминаем Сейфзону перед началом круга
-            local safeZoneCFrame = HumanoidRootPart.CFrame
+            -- ИСПРАВЛЕНИЕ 1: Запоминаем базу ОДИН раз строго в момент включения скрипта
+            if not safeZoneCFrame then
+                safeZoneCFrame = HumanoidRootPart.CFrame
+                print("[Core Sell] База успешно сохранена на текущей позиции!")
+            end
+
             local maxCarry = getCurrentCarryLimit()
             local allPets = getAvailablePetsWithLimit()
             
@@ -112,11 +118,9 @@ while true do
                 
                 local gatheredCount = 0
                 
-                -- Начинаем сбор по локациям
+                -- Начинаем сбор
                 for _, petData in ipairs(allPets) do
-                    -- Прерываем круг, если посреди фарма выключили Toggle
                     if not _G.AutoSellEnabled then break end
-                    -- Если забили сумку — выходим из сбора
                     if gatheredCount >= maxCarry then break end
                     
                     if petData.Item and petData.Item.Parent and Character.Parent then
@@ -132,14 +136,14 @@ while true do
                     end
                 end
                 
-                -- 2. ТП на базу в безопасную зону
-                print("[Core Sell] Рюкзак забит или петы кончились. Летим в SafeZone...")
-                HumanoidRootPart.CFrame = safeZoneCFrame
-                task.wait(0.1)
+                -- ТП на сохраненную базу
+                if safeZoneCFrame then
+                    HumanoidRootPart.CFrame = safeZoneCFrame
+                end
+                task.wait(0.3)
                 
-                -- 3. Юзаем Ремоут на продажу инвентаря
+                -- Продажа инвентаря
                 if _G.AutoSellEnabled then
-                    print("[Core Sell] Продаем собранных петов...")
                     pcall(function()
                         SellRemote:FireServer(unpack({ "Inventory" }))
                     end)
@@ -147,9 +151,12 @@ while true do
                 
                 task.wait(DELAY_AFTER_SELL)
             else
-                print("[Core Sell] На карте остались только 'последние' петы (по 1 в каждой папке). Ждем респавна...")
-                task.wait(3)
+                print("[Core Sell] Свободных петов нет (осталось по 1 на локациях). Ждем респавна...")
+                task.wait(2)
             end
         end
+    else
+        -- Если выключили тумблер — сбрасываем сохраненную базу, чтобы переназначить её при следующем включении
+        safeZoneCFrame = nil
     end
 end
