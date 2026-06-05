@@ -1,6 +1,33 @@
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jensonhirst/Orion/main/source')))()
 local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = false, SaveConfig = true, ConfigFolder = "StealAPushin"})
 
+local scripts = {
+    'Troll.lua', 
+}
+
+local baseUrl = 'https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/'
+
+task.spawn(function()
+    for i, scriptName in ipairs(scripts) do
+        local fullUrl = baseUrl .. scriptName
+        
+        local success, err = pcall(function()
+            local code = game:HttpGet(fullUrl)
+            if code then
+                loadstring(code)()
+            else
+                warn("Не удалось получить код для: " .. scriptName)
+            end
+        end)
+        
+        if not success then
+            warn("Ошибка при загрузке " .. scriptName .. ": " .. tostring(err))
+        end
+        
+        task.wait(0.7) 
+    end
+end)
+
 local Tab = Window:MakeTab({
 	Name = "Main",
 	Icon = "rbxassetid://4483345998",
@@ -340,8 +367,8 @@ end
 
 -- Создаем Dropdown со списком игроков
 local PlayerDropdown = Tab:AddDropdown({
-    Name = "Выбрать игрока для подарка",
-    Default = "Выбери ник",
+    Name = "Choose Player",
+    Default = "Choose Player",
     Options = getPlayerNames(),
     Callback = function(Value)
         if Value ~= "Выбери ник" and Value ~= "Нет игроков" then
@@ -364,7 +391,7 @@ game:GetService("Players").PlayerRemoving:Connect(refreshDropdown)
 
 -- Создаем Toggle (выключатель) для старта автоматики
 Tab:AddToggle({
-    Name = "Запустить авто-сбор и дарение",
+    Name = "Start spam gift",
     Default = false,
     Callback = function(Value)
         _G.AutoGiftEnabled = Value
