@@ -59,14 +59,6 @@ hrp.CFrame = (target:IsA("Model") and target:GetPivot() or target.CFrame) * CFra
     end    
 }) 
 
-Tab:AddButton({
-    Name = "Monitoring pets",
-    Callback = function()
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/StealerGui.lua'))()
-    end    
-})
-
-
 Tab:AddSlider({
     Name = "Change Speed",
     Min = 0,
@@ -85,6 +77,33 @@ Tab:AddSlider({
         end
     end    
 })
+
+local Tab = Window:MakeTab({
+	Name = "Sniper Pets",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+}) 
+
+local Section = Tab:AddSection({
+	Name = "Sniper"
+})
+
+Tab:AddButton({
+    Name = "Sniper Pets",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/SniperGui.lua'))()
+    end    
+})
+
+
+Tab:AddButton({
+    Name = "Monitoring pets",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/StealerGui.lua'))()
+    end    
+})
+
+
 
 
 
