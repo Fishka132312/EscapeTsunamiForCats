@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════
--- PET SNIPER v1.0 | LocalScripttttt
+-- PET SNIPER v1.0 | LocalScripвввввв
 -- ══════════════════════════════════════════════════════════════
 
 local Players            = game:GetService("Players")
@@ -577,29 +577,28 @@ ClearAllCorner.Parent = ClearAllBtn
 
 -- Список петов (прокручиваемый)
 local PetScroll = Instance.new("ScrollingFrame")
-PetScroll.Size                 = UDim2.new(1, 0, 0, 285)
-PetScroll.Position             = UDim2.new(0, 0, 0, 68)
-PetScroll.BackgroundColor3     = Color3.fromRGB(20, 20, 28)
-PetScroll.BorderSizePixel      = 0
-PetScroll.ScrollBarThickness   = 4
+PetScroll.Size              = UDim2.new(1, 0, 0, 285)
+PetScroll.Position          = UDim2.new(0, 0, 0, 68)
+PetScroll.BackgroundColor3  = Color3.fromRGB(20, 20, 28)
+PetScroll.BorderSizePixel   = 0
+PetScroll.ScrollBarThickness = 4
 PetScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 160, 255)
-PetScroll.CanvasSize           = UDim2.new(0, 0, 0, 0)
-PetScroll.ClipsDescendants     = true -- КРИТИЧЕСКИ ВАЖНО: скрывает всё, что вылезает за границы списка
-PetScroll.Parent               = PetsPage
+PetScroll.CanvasSize        = UDim2.new(0, 0, 0, 0)
+PetScroll.Parent            = PetsPage
 
 local ScrollCorner = Instance.new("UICorner")
 ScrollCorner.CornerRadius = UDim.new(0, 7)
 ScrollCorner.Parent = PetScroll
 
 local PetListLayout = Instance.new("UIListLayout")
-PetListLayout.Padding       = UDim.new(0, 4) -- Чуть увеличили отступ для стиля
+PetListLayout.Padding       = UDim.new(0, 2)
 PetListLayout.SortOrder     = Enum.SortOrder.LayoutOrder
 PetListLayout.Parent        = PetScroll
 
 local PetListPad = Instance.new("UIPadding")
-PetListPad.PaddingTop    = UDim.new(0, 6)
-PetListPad.PaddingLeft   = UDim.new(0, 6)
-PetListPad.PaddingRight  = UDim.new(0, 6)
+PetListPad.PaddingTop    = UDim.new(0, 4)
+PetListPad.PaddingLeft   = UDim.new(0, 4)
+PetListPad.PaddingRight  = UDim.new(0, 4)
 PetListPad.Parent        = PetScroll
 
 local petButtons = {}
@@ -608,77 +607,71 @@ local function createPetButton(petName)
     local rarity = (itemConfig and itemConfig[petName] and itemConfig[petName].Rarity) or "Common"
     local rarityColor = RARITY_COLORS[rarity] or Color3.fromRGB(180, 180, 180)
 
-    -- Основная кнопка
     local btn = Instance.new("TextButton")
-    btn.Size             = UDim2.new(1, 0, 0, 34) -- Сделали кнопки чуть выше и адаптивными по ширине (1, 0)
+    btn.Size             = UDim2.new(1, -8, 0, 30)
     btn.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
     btn.Text             = ""
     btn.BorderSizePixel  = 0
     btn.AutoButtonColor  = false
-    btn.ClipsDescendants = true -- Элементы внутри кнопки не вылезут за ее скругленные углы
     btn.Parent           = PetScroll
 
     local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.CornerRadius = UDim.new(0, 5)
     btnCorner.Parent = btn
 
-    -- Стильная неоновая обводка (по умолчанию прозрачная, плавно загорается при наведении)
-    local btnStroke = Instance.new("UIStroke")
-    btnStroke.Thickness = 1
-    btnStroke.Color = Color3.fromRGB(80, 160, 255)
-    btnStroke.Transparency = 1 -- Скрыта
-    btnStroke.Parent = btn
-
-    -- Цветная вертикальная полоска редкости слева
+    -- Цветная полоска редкости
     local rarityBar = Instance.new("Frame")
-    rarityBar.Size             = UDim2.new(0, 4, 1, 0) -- На всю высоту кнопки
-    rarityBar.Position         = UDim2.new(0, 0, 0, 0)
+    rarityBar.Size             = UDim2.new(0, 3, 1, -6)
+    rarityBar.Position         = UDim2.new(0, 3, 0, 3)
     rarityBar.BackgroundColor3 = rarityColor
     rarityBar.BorderSizePixel  = 0
     rarityBar.Parent           = btn
 
-    -- Иконка пета
+    local barCorner = Instance.new("UICorner")
+    barCorner.CornerRadius = UDim.new(0, 2)
+    barCorner.Parent = rarityBar
+
+    -- Картинка пета
     local petImage = Instance.new("ImageLabel")
-    petImage.Size = UDim2.new(0, 24, 0, 24)
-    petImage.Position = UDim2.new(0, 14, 0.5, -12)
+    petImage.Size = UDim2.new(0, 22, 0, 22)
+    petImage.Position = UDim2.new(0, 10, 0.5, -11)
     petImage.BackgroundTransparency = 1
     petImage.Image = petImages[petName] or "rbxassetid://0"
-    petImage.ImageColor3 = Color3.fromRGB(230, 230, 230) -- Слегка приглушенная иконка
     petImage.Parent = btn
 
-    -- Текст имени пета
+    -- Имя пета
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size              = UDim2.new(1, -165, 1, 0)
-    nameLabel.Position          = UDim2.new(0, 46, 0, 0)
+    nameLabel.Size              = UDim2.new(1, -150, 1, 0)
+    nameLabel.Position          = UDim2.new(0, 38, 0, 0)
     nameLabel.BackgroundTransparency = 1
     nameLabel.Text              = petName
-    nameLabel.TextColor3        = Color3.fromRGB(230, 230, 230)
-    nameLabel.TextSize          = 13
-    nameLabel.Font              = Enum.Font.GothamMedium
+    nameLabel.TextColor3        = Color3.fromRGB(220, 220, 220)
+    nameLabel.TextSize          = 12
+    nameLabel.Font              = Enum.Font.Gotham
     nameLabel.TextXAlignment    = Enum.TextXAlignment.Left
     nameLabel.TextTruncate      = Enum.TextTruncate.AtEnd
     nameLabel.Parent            = btn
 
-    -- Текст редкости
+    -- Редкость справа
     local rarityLabel = Instance.new("TextLabel")
-    rarityLabel.Size              = UDim2.new(0, 75, 1, 0)
+    rarityLabel.Size              = UDim2.new(0, 80, 1, 0)
     rarityLabel.Position          = UDim2.new(1, -110, 0, 0)
     rarityLabel.BackgroundTransparency = 1
-    rarityLabel.Text              = rarity:upper() -- Капсом выглядит премиальнее
+    rarityLabel.Text              = rarity
     rarityLabel.TextColor3        = rarityColor
-    rarityLabel.TextSize          = 9
-    rarityLabel.Font              = Enum.Font.GothamBold
+    rarityLabel.TextSize          = 10
+    rarityLabel.Font              = Enum.Font.GothamSemibold
     rarityLabel.TextXAlignment    = Enum.TextXAlignment.Right
     rarityLabel.Parent            = btn
 
-    -- Кастомный чекбокс (квадрат со скруглением)
+    -- Чекбокс
     local checkMark = Instance.new("TextLabel")
     checkMark.Size              = UDim2.new(0, 18, 0, 18)
-    checkMark.Position          = UDim2.new(1, -26, 0.5, -9)
-    checkMark.BackgroundColor3  = Color3.fromRGB(38, 38, 52)
+    checkMark.Position          = UDim2.new(1, -22, 0.5, -9)
+    checkMark.BackgroundColor3  = Color3.fromRGB(30, 30, 42)
     checkMark.Text              = ""
-    checkMark.TextColor3        = Color3.fromRGB(255, 255, 255)
-    checkMark.TextSize          = 11
+    checkMark.TextColor3        = Color3.fromRGB(80, 200, 100)
+    checkMark.TextSize          = 12
     checkMark.Font              = Enum.Font.GothamBold
     checkMark.BorderSizePixel   = 0
     checkMark.Parent            = btn
@@ -687,45 +680,34 @@ local function createPetButton(petName)
     checkCorner.CornerRadius = UDim.new(0, 4)
     checkCorner.Parent = checkMark
 
-    -- Логика визуального обновления статуса "Выбран / Не выбран"
+    -- Обновление состояния кнопки
     local function updateCheck()
         if selectedPets[petName] then
             checkMark.Text             = "✓"
-            checkMark.BackgroundColor3 = Color3.fromRGB(80, 160, 255) -- Стильный голубой вместо ядовито-зеленого
-            btn.BackgroundColor3       = Color3.fromRGB(34, 38, 55)    -- Легкий оттенок выделения фона
+            checkMark.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+            btn.BackgroundColor3       = Color3.fromRGB(25, 45, 30)
         else
             checkMark.Text             = ""
-            checkMark.BackgroundColor3 = Color3.fromRGB(38, 38, 52)
+            checkMark.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
             btn.BackgroundColor3       = Color3.fromRGB(28, 28, 38)
         end
     end
 
     -- =======================================================================
-    -- ПЛАВНЫЕ И КРАСИВЫЕ АНИМАЦИИ (ТВИНЫ) ПРИ НАВЕДЕНИИ
+    -- БЕЗОПАСНАЯ И ЛЕГКАЯ ПОДСВЕТКА (БЕЗ ИЗМЕНЕНИЯ РАЗМЕРОВ)
     -- =======================================================================
-    local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-
     btn.MouseEnter:Connect(function()
-        -- При наведении: плавно включаем обводку, делаем ярче фон и подсвечиваем иконку
-        TweenService:Create(btnStroke, tweenInfo, { Transparency = 0 }):Play()
-        TweenService:Create(petImage, tweenInfo, { ImageColor3 = Color3.fromRGB(255, 255, 255) }):Play()
+        -- Если кнопка не выбрана, делаем фон чуточку светлее
         if not selectedPets[petName] then
-            TweenService:Create(btn, tweenInfo, { BackgroundColor3 = Color3.fromRGB(35, 35, 48) }):Play()
+            btn.BackgroundColor3 = Color3.fromRGB(36, 36, 48)
         end
     end)
 
     btn.MouseLeave:Connect(function()
-        -- Когда убираем мышь: возвращаем всё в исходное состояние
-        TweenService:Create(btnStroke, tweenInfo, { Transparency = 1 }):Play()
-        TweenService:Create(petImage, tweenInfo, { ImageColor3 = Color3.fromRGB(230, 230, 230) }):Play()
-        if not selectedPets[petName] then
-            TweenService:Create(btn, tweenInfo, { BackgroundColor3 = Color3.fromRGB(28, 28, 38) }):Play()
-        else
-            TweenService:Create(btn, tweenInfo, { BackgroundColor3 = Color3.fromRGB(34, 38, 55) }):Play()
-        end
+        -- При уходе мыши возвращаем оригинальный цвет в зависимости от галочки
+        updateCheck()
     end)
 
-    -- Клик по кнопке
     btn.MouseButton1Click:Connect(function()
         selectedPets[petName] = not selectedPets[petName]
         updateCheck()
@@ -736,31 +718,25 @@ local function createPetButton(petName)
     return btn
 end
 
--- =======================================================================
--- ОБНОВЛЕНИЕ И ФИЛЬТРАЦИЯ СПИСКА
--- =======================================================================
+-- Заполняем список
 local function refreshPetList(filter)
     filter = (filter or ""):lower()
     for _, name in ipairs(allPetNames) do
         local btn = petButtons[name]
         if btn then
             local visible = filter == "" or name:lower():find(filter, 1, true)
-            btn.button.Visible = not not visible
+            btn.button.Visible = visible ~= nil and visible ~= false
         end
     end
-    -- Корректный динамический пересчет размера скролла
-    task.skipFrame() -- Даем UIListLayout обновить AbsoluteContentSize
-    PetScroll.CanvasSize = UDim2.new(0, 0, 0, PetListLayout.AbsoluteContentSize.Y + 12)
+    -- Родной и стабильный расчет размера скролла
+    PetScroll.CanvasSize = UDim2.new(0, 0, 0, PetListLayout.AbsoluteContentSize.Y + 8)
 end
 
--- Первоначальное заполнение
 for _, name in ipairs(allPetNames) do
     createPetButton(name)
 end
-task.skipFrame()
-PetScroll.CanvasSize = UDim2.new(0, 0, 0, PetListLayout.AbsoluteContentSize.Y + 12)
+PetScroll.CanvasSize = UDim2.new(0, 0, 0, PetListLayout.AbsoluteContentSize.Y + 8)
 
--- Слушатели событий UI элементов управления
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     refreshPetList(SearchBox.Text)
 end)
@@ -771,6 +747,7 @@ SelectAllBtn.MouseButton1Click:Connect(function()
         selectedPets[name] = true
         if petButtons[name] then petButtons[name].updateCheck() end
     end
+    PetScroll.CanvasSize = UDim2.new(0, 0, 0, PetListLayout.AbsoluteContentSize.Y + 8)
 end)
 
 ClearAllBtn.MouseButton1Click:Connect(function()
@@ -779,6 +756,7 @@ ClearAllBtn.MouseButton1Click:Connect(function()
         selectedPets[name] = false
         if petButtons[name] then petButtons[name].updateCheck() end
     end
+    PetScroll.CanvasSize = UDim2.new(0, 0, 0, PetListLayout.AbsoluteContentSize.Y + 8)
 end)
 
 -- ══════════════════════════════════════════════════════════════
