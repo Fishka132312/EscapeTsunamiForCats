@@ -950,17 +950,42 @@ function _G.PetMonitorRenderList()
     currentRenderId = currentRenderId + 1
     local myRenderId = currentRenderId
 
+    -- ══════════════════════════════════════════════════════════════
+    -- ФОРСИРОВАННЫЙ СБОР ВСЕХ ПЕТОВ С КАРТЫ (ДЛЯ МГНОВЕННОГО ОБНОВЛЕНИЯ)
+    -- ══════════════════════════════════════════════════════════════
+    -- Сканируем все парты/зоны в ItemSpawners прямо в момент клика
+    local allZones = ItemSpawners:GetChildren()
+    for _, zone in ipairs(allZones) do
+        local rarKey = zone.Name
+        if RARITY_ORDER[rarKey] then
+            for _, pet in ipairs(zone:GetChildren()) do
+                -- Если пета нет в кэше, но у него уже догрузился InfoGUI — принудительно забираем его
+                if not petCache[pet] and pet:FindFirstChild("InfoGUI") then
+                    local data = extractPetData(pet, rarKey)
+                    petCache[pet] = data
+                end
+            end
+        end
+    end
+
     -- 1. Собираем отфильтрованных и отсортированных петов
     local filtered = {}
     local filteredSet = {}
     
     for pet, data in pairs(petCache) do
-        if petPassesFilter(data) then
+        -- Проверяем, существует ли пет физически в игре (защита от фантомных карт)
+        if pet and pet.Parent and petPassesFilter(data) then
             table.insert(filtered, { pet = pet, data = data })
             filteredSet[pet] = true
+        else
+            -- Если пета удалили или его забрали, чистим кэш
+            if not pet or not pet.Parent then
+                petCache[pet] = nil
+            end
         end
     end
 
+    -- Сортируем по приоритетам (редкости и мутации)
     table.sort(filtered, function(a, b)
         return getCardSortOrder(a.data) < getCardSortOrder(b.data)
     end)
@@ -973,14 +998,14 @@ function _G.PetMonitorRenderList()
         end
     end
 
-    -- 3. Счетчик берем напрямую из размера отфильтрованного списка (это гарантирует точность)
+    -- 3. Счетчик берем напрямую из размера отфильтрованного списка
     local totalFilteredCount = #filtered
     countLabel.Text = totalFilteredCount .. " pet" .. (totalFilteredCount ~= 1 and "s" or "")
 
-    -- 4. Рендерим список БЕЗ опасных задержек в цикле
+    -- 4. Рендерим список МГНОВЕННО и без задержек в цикле
     task.spawn(function()
         for i, entry in ipairs(filtered) do
-            -- Проверка на то, не поменялся ли рендер (оставляем для безопасности)
+            -- Проверка: если за эту миллисекунду ты нажал другой фильтр — отменяем старый поток
             if currentRenderId ~= myRenderId then break end
 
             local pet = entry.pet
@@ -988,22 +1013,20 @@ function _G.PetMonitorRenderList()
             local card = cardFrames[pet]
 
             if card then
-                -- Пет уже на экране: меняем порядок и обновляем инфу
+                -- Пет уже на экране: меняем порядок и обновляем динамические данные (таймер, деньги)
                 card.LayoutOrder = i
                 updateCardDynamicData(card, data)
             else
-                -- Новый пет: создаем МГНОВЕННО, чтобы цикл не оборвался
+                -- Новая карточка: создаем МГНОВЕННО
                 card = createPetCard(pet, data)
                 card.LayoutOrder = i
                 cardFrames[pet] = card
-                
-                -- Если тебе ОЧЕНЬ нужна плавная анимация появления (например, Tween),
-                -- делай её ВНУТРИ функции createPetCard(pet, data), но не делай task.wait() здесь!
             end
         end
     end)
 end
 
+--дщд
 -- ══════════════════════════════════════════════════════════════
 -- 7. ФУНКЦИЯ STEAL
 -- ══════════════════════════════════════════════════════════════
