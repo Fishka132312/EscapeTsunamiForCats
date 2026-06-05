@@ -155,30 +155,45 @@ local function stealPet(pet, petData)
     if isStealing then return end
     isStealing = true
 
-    -- Обновляем Character (мог респавниться)
-    Character       = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+    -- Безопасно получаем персонажа БЕЗ вечного ожидания CharacterAdded:Wait()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
-    -- 1. Телепорт к пету
-    if petData.headPart then
-        HumanoidRootPart.CFrame = petData.headPart.CFrame + Vector3.new(0, 2, 0)
-    end
-    task.wait(STEAL_TELEPORT_WAIT)
-
-    -- 2. FireProximityPrompt
-    if petData.prompt then
-        task.wait(STEAL_PROMPT_WAIT)
-        fireproximityprompt(petData.prompt)
+    -- Если персонаж или HRP не найдены, сразу сбрасываем флаг кражи и выходим
+    if not hrp then 
+        isStealing = false 
+        return 
     end
 
-    task.wait(STEAL_RETURN_WAIT)
+    -- Оборачиваем весь процесс в pcall, чтобы при любой ошибке (если пет пропал) скрипт не зависал
+    local success, err = pcall(function()
+        -- 1. Телепорт к пету
+        if petData.headPart and petData.headPart.Parent then
+            hrp.CFrame = petData.headPart.CFrame + Vector3.new(0, 2, 0)
+        else
+            return
+        end
+        task.wait(STEAL_TELEPORT_WAIT)
 
-    -- 3. Телепорт в SafeZone
-    HumanoidRootPart.CFrame = CFrame.new(getSafeZonePosition())
+        -- 2. Активация ProximityPrompt
+        if petData.prompt and petData.prompt.Parent then
+            task.wait(STEAL_PROMPT_WAIT)
+            fireproximityprompt(petData.prompt)
+        end
 
-    isStealing = false
+        task.wait(STEAL_RETURN_WAIT)
+    end)
+
+    -- Гарантированно открываем "замок" для следующего пета, даже если была ошибка
+    isStealing = false 
+
+    -- 3. Телепорт в SafeZone (проверяем HRP заново на случай, если персонаж обновился)
+    local refreshChar = LocalPlayer.Character
+    local refreshHrp = refreshChar and refreshChar:FindFirstChild("HumanoidRootPart")
+    if refreshHrp then
+        refreshHrp.CFrame = CFrame.new(getSafeZonePosition())
+    end
 end
-
 -- Проверяем, подходит ли пет под фильтры
 local function petMatchesFilters(petData)
     -- Проверка имени
@@ -900,43 +915,49 @@ local function updateStartBtn()
 end
 
 StartBtn.MouseButton1Click:Connect(function()
-    -- Проверяем что выбран хотя бы один пет
-    local hasPet = snipeAllPets
-    if not hasPet then
-        for _, v in pairs(selectedPets) do
-            if v then hasPet = true break end
-        end
-    end
+    -- Проверяем что выбран хотя бы один пет [cite: 68]
+    local hasPet = snipeAllPets [cite: 70]
+    if not hasPet then [cite: 70]
+        for _, v in pairs(selectedPets) do [cite: 71]
+            if v then hasPet = true break end [cite: 71]
+        end [cite: 71]
+    end [cite: 71]
 
-    if not hasPet then
-        StatusLabel.Text       = "⚠️  Выбери хотя бы одного пета!"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
-        return
-    end
+    if not hasPet then [cite: 71]
+        StatusLabel.Text       = "⚠️  Выбери хотя бы одного пета!" [cite: 71]
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50) [cite: 71]
+        return [cite: 71]
+    end [cite: 71]
 
-    local hasMut = snipeAllMutations
-    if not hasMut then
-        for _, v in pairs(selectedMutations) do
-            if v then hasMut = true break end
-        end
-    end
+    local hasMut = snipeAllMutations [cite: 71]
+    if not hasMut then [cite: 71]
+        for _, v in pairs(selectedMutations) do [cite: 72]
+            if v then hasMut = true break end [cite: 72]
+        end [cite: 72]
+    end [cite: 72]
 
-    if not hasMut then
-        StatusLabel.Text       = "⚠️  Выбери хотя бы одну мутацию!"
-        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
-        return
-    end
+    if not hasMut then [cite: 72]
+        StatusLabel.Text       = "⚠️  Выбери хотя бы одну мутацию!" [cite: 72]
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50) [cite: 72]
+        return [cite: 72]
+    end [cite: 72]
 
-    sniperActive = not sniperActive
-    updateStartBtn()
+    sniperActive = not sniperActive [cite: 72]
+    updateStartBtn() [cite: 73]
 
-    if sniperActive then
-        connectSpawners()
-        -- Также проверяем уже существующих петов
-        task.spawn(scanAndSnipe)
+    if sniperActive then [cite: 73]
+        connectSpawners() [cite: 73]
+        
+        -- Включаем бесконечный фоновый цикл проверки карты, пока снайпер активен
+        task.spawn(function()
+            while sniperActive do
+                scanAndSnipe()
+                task.wait(0.5) -- Проверяем локацию на наличие петов каждые полсекунды
+            end
+        end)
     else
-        for _, conn in ipairs(connections) do conn:Disconnect() end
-        connections = {}
+        for _, conn in ipairs(connections) do conn:Disconnect() end [cite: 73]
+        connections = {} [cite: 73]
     end
 end)
 
