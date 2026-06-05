@@ -1,304 +1,351 @@
--- ============================================================
---  PVP LocalScript | Roblox
---  Требования: LocalScript внутри StarterPlayerScripts
--- ============================================================
+--[[
+    PVP Utility Script
+    LocalScript (Executor)
+    Luau | Roblox
 
--- ┌─────────────────────────────────────────────────────────┐
--- │                   НАСТРОЙКИ (CONFIG)                    │
--- └─────────────────────────────────────────────────────────┘
+    Управление: _G.PVP = true/false
+--]]
+
+-- ============================================================
+--  КОНФИГ — все настройки в одном месте
+-- ============================================================
 local CONFIG = {
-    -- Анти-атака
-    ANTI_ATTACK_RADIUS   = 9,      -- studs: радиус срабатывания защиты
-    PUSHBACK_FORCE       = 90,     -- сила отталкивания (studs/s)
-    PUSHBACK_Y           = 8,      -- вертикальная составляющая отталкивания
-    PUSHBACK_DURATION    = 0.18,   -- секунд действия BodyVelocity
-
-    -- Атака
-    ATTACK_RADIUS        = 100,    -- studs: радиус поиска цели
-    TELEPORT_BEHIND_DIST = 3.5,    -- studs: насколько сзади цели встать
-    RETURN_DELAY         = 0.45,   -- секунд до возврата на исходную позицию
-    ATTACK_COOLDOWN      = 0.6,    -- секунд между атаками
-
-    -- Системные
-    ATTACK_TOOLS         = {"Bat", "Slap"},  -- имена инструментов
-    PUSHBACK_IMMUNE_TIME = 0.7,    -- секунд иммунитета к отталкиванию после телепорта
+    DODGE_RADIUS    = 11,   -- Студов: дистанция, при которой срабатывает авто-додж
+    ATTACK_RADIUS   = 100,  -- Студов: макс. дистанция для блинк-атаки
+    ATTACK_DURATION = 1,    -- Секунд: сколько держимся за спиной цели
+    BEHIND_OFFSET   = 3.5,  -- Студов: насколько сзади мы встаём (от центра тела)
+    TOOL_NAMES      = { Bat = true, Slap = true }, -- Инструменты, на которые реагируем
 }
 
--- ┌─────────────────────────────────────────────────────────┐
--- │                   СЕРВИСЫ                               │
--- └─────────────────────────────────────────────────────────┘
-local Players     = game:GetService("Players")
-local RunService  = game:GetService("RunService")
+-- ============================================================
+--  СЕРВИСЫ
+-- ============================================================
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local Workspace      = game:GetService("Workspace")
 
+-- ============================================================
+--  ССЫЛКИ НА ЛОКАЛЬНОГО ИГРОКА
+-- ============================================================
 local LocalPlayer = Players.LocalPlayer
 
--- ┌─────────────────────────────────────────────────────────┐
--- │                   СОСТОЯНИЕ                             │
--- └─────────────────────────────────────────────────────────┘
-local State = {
-    isTeleporting    = false,   -- флаг: сейчас выполняется телепорт-атака
-    lastAttackTime   = 0,       -- тик последней атаки
-    connections      = {},      -- все соединения для cleanup
-    toolConnections  = {},      -- соединения конкретного инструмента
-}
+-- ============================================================
+--  ФЛАГИ СОСТОЯНИЯ (анти-глитч / дебаунс)
+-- ============================================================
+local isAttacking = false   -- true во время блинк-атаки
+local isDodging   = false   -- true во время авто-доджа
 
--- ┌─────────────────────────────────────────────────────────┐
--- │                   ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ               │
--- └─────────────────────────────────────────────────────────┘
+-- Текущая цель атаки (чтобы додж игнорировал именно её)
+local attackTarget: Player? = nil
 
---- Получить символ и HRP локального игрока (или nil)
-local function getLocalCharacter()
-    local char = LocalPlayer.Character
-    if not char then return nil, nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum or hum.Health <= 0 then return nil, nil end
-    return char, hrp
+-- ============================================================
+--  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+-- ============================================================
+
+--- Возвращает корневую часть (HumanoidRootPart) персонажа игрока,
+--- или nil, если персонаж не загружен / мёртв.
+local function getRootPart(player: Player): BasePart?
+    local char = player.Character
+    if not char then return nil end
+    local hrp = char:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not hrp then return nil end
+    local hum = char:FindFirstChildOfClass("Humanoid") :: Humanoid?
+    if not hum or hum.Health <= 0 then return nil end
+    return hrp
 end
 
---- Проверить: имя инструмента входит в список атакующих
-local function isAttackTool(name)
-    for _, n in ipairs(CONFIG.ATTACK_TOOLS) do
-        if n == name then return true end
+--- Проверяет, экипирован ли у игрока Tool из списка CONFIG.TOOL_NAMES.
+local function hasDangerousTool(player: Player): boolean
+    local char = player.Character
+    if not char then return false end
+    for _, obj in char:GetChildren() do
+        if obj:IsA("Tool") and CONFIG.TOOL_NAMES[obj.Name] then
+            return true
+        end
     end
     return false
 end
 
---- Получить экипированный атакующий инструмент игрока (или nil)
-local function getEquippedAttackTool(character)
-    if not character then return nil end
-    for _, child in ipairs(character:GetChildren()) do
-        if child:IsA("Tool") and isAttackTool(child.Name) then
-            return child
-        end
-    end
-    return nil
+--- Возвращает позицию ЗА СПИНОЙ указанной BasePart.
+--- offset — расстояние сзади в студах.
+local function getBehindPosition(targetRoot: BasePart, offset: number): Vector3
+    -- LookVector смотрит вперёд; -LookVector — назад
+    return targetRoot.Position - (targetRoot.CFrame.LookVector * offset)
 end
 
---- Найти ближайшего живого игрока (исключая Local) в радиусе
-local function getNearestPlayer(origin, radius)
-    local closest, closestDist = nil, radius + 1
-    for _, player in ipairs(Players:GetPlayers()) do
+--- Raycast-проверка: можно ли безопасно встать в точку dest из точки origin?
+--- Возвращает (безопасно: bool, скорректированная точка: Vector3).
+local function findSafePosition(origin: Vector3, dest: Vector3): (boolean, Vector3)
+    local direction = dest - origin
+    local distance  = direction.Magnitude
+
+    if distance < 0.01 then
+        -- Точки совпадают — просто разрешаем
+        return true, dest
+    end
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    -- Исключаем собственного персонажа из Raycast
+    local myChar = LocalPlayer.Character
+    if myChar then
+        rayParams.FilterDescendantsInstances = { myChar }
+    end
+
+    local result = Workspace:Raycast(origin, direction.Unit * distance, rayParams)
+
+    if result then
+        -- Луч что-то задел — берём точку чуть ПЕРЕД препятствием (0.5 ст. отступ)
+        local safePoint = result.Position + result.Normal * 0.5
+        return false, safePoint
+    end
+
+    return true, dest
+end
+
+--- Мгновенно телепортирует LocalPlayer в указанную позицию.
+--- Разворачивает персонажа лицом к faceTarget (если передан).
+local function teleportTo(position: Vector3, faceTarget: Vector3?)
+    local myRoot = getRootPart(LocalPlayer)
+    if not myRoot then return end
+
+    local newCF: CFrame
+    if faceTarget then
+        -- Смотрим на цель, но берём только горизонтальную ориентацию
+        local lookAt = Vector3.new(faceTarget.X, position.Y, faceTarget.Z)
+        newCF = CFrame.lookAt(position, lookAt)
+    else
+        newCF = CFrame.new(position)
+    end
+
+    myRoot.CFrame = newCF
+end
+
+--- Возвращает ближайшего живого врага в радиусе maxDist (в студах).
+--- Исключает самого LocalPlayer.
+local function findNearestEnemy(maxDist: number): (Player?, BasePart?)
+    local myRoot = getRootPart(LocalPlayer)
+    if not myRoot then return nil, nil end
+
+    local bestDist   = maxDist
+    local bestPlayer: Player? = nil
+    local bestRoot:   BasePart? = nil
+
+    for _, player in Players:GetPlayers() do
         if player == LocalPlayer then continue end
-        local char = player.Character
-        if not char then continue end
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not hum or hum.Health <= 0 then continue end
-        local dist = (hrp.Position - origin).Magnitude
-        if dist < closestDist then
-            closestDist = dist
-            closest = player
+
+        local root = getRootPart(player)
+        if not root then continue end
+
+        local dist = (root.Position - myRoot.Position).Magnitude
+        if dist < bestDist then
+            bestDist   = dist
+            bestPlayer = player
+            bestRoot   = root
         end
     end
-    return closest
+
+    return bestPlayer, bestRoot
 end
 
---- Безопасно отключить и очистить список соединений
-local function cleanupConnections(list)
-    for _, conn in ipairs(list) do
-        if typeof(conn) == "RBXScriptConnection" then
-            conn:Disconnect()
-        end
-    end
-    table.clear(list)
-end
+-- ============================================================
+--  БЛИНК-АТАКА
+-- ============================================================
 
--- ┌─────────────────────────────────────────────────────────┐
--- │               АНТИ-АТАКА (ЗАЩИТА)                       │
--- └─────────────────────────────────────────────────────────┘
-
---- Создать кратковременный BodyVelocity для отталкивания
-local function applyPushback(hrp, direction)
-    -- Убираем старый BV если есть
-    local old = hrp:FindFirstChild("__PVP_BV")
-    if old then old:Destroy() end
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name      = "__PVP_BV"
-    bv.Velocity  = direction
-    bv.MaxForce  = Vector3.new(1e5, 1e5, 1e5)
-    bv.P         = 1e4
-    bv.Parent    = hrp
-
-    task.delay(CONFIG.PUSHBACK_DURATION, function()
-        if bv and bv.Parent then bv:Destroy() end
-    end)
-end
-
---- Основной цикл анти-атаки — вызывается каждый Heartbeat
-local function antiAttackStep()
-    -- Не работаем во время телепорт-атаки
-    if State.isTeleporting then return end
-
-    local char, hrp = getLocalCharacter()
-    if not char then return end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        local enemyChar = player.Character
-        if not enemyChar then continue end
-
-        -- Проверяем экипированный инструмент врага
-        if not getEquippedAttackTool(enemyChar) then continue end
-
-        local enemyHRP = enemyChar:FindFirstChild("HumanoidRootPart")
-        if not enemyHRP then continue end
-
-        local dist = (hrp.Position - enemyHRP.Position).Magnitude
-        if dist < CONFIG.ANTI_ATTACK_RADIUS then
-            -- Направление от врага к нам + небольшой Y
-            local pushDir = (hrp.Position - enemyHRP.Position).Unit
-            pushDir = Vector3.new(pushDir.X, 0.15, pushDir.Z).Unit
-            applyPushback(hrp, pushDir * CONFIG.PUSHBACK_FORCE
-                + Vector3.new(0, CONFIG.PUSHBACK_Y, 0))
-        end
-    end
-end
-
--- ┌─────────────────────────────────────────────────────────┐
--- │               ТЕЛЕПОРТ-АТАКА                            │
--- └─────────────────────────────────────────────────────────┘
-
---- Выполнить телепорт-атаку к цели и обратно
-local function performAttack(localChar, localHRP)
-    local now = tick()
-    if now - State.lastAttackTime < CONFIG.ATTACK_COOLDOWN then return end
-
-    local target = getNearestPlayer(localHRP.Position, CONFIG.ATTACK_RADIUS)
-    if not target then return end
-
-    local targetChar = target.Character
-    if not targetChar then return end
-    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-    if not targetHRP then return end
-
-    -- Запоминаем исходную позицию и угол
-    local originCFrame = localHRP.CFrame
-    State.lastAttackTime = now
-    State.isTeleporting  = true
-
-    -- Вычисляем позицию «за спиной» цели
-    local targetCF = targetHRP.CFrame
-    -- Вектор «назад» для цели (её -LookVector = направление за спину)
-    local behindPos = targetCF.Position - targetCF.LookVector * CONFIG.TELEPORT_BEHIND_DIST
-
-    -- Смотрим лицом к цели
-    local facingCF = CFrame.new(behindPos, targetHRP.Position)
-
-    -- Телепорт к цели
-    localHRP.CFrame = facingCF
-
-    -- Небольшая пауза (имитация удара)
-    task.wait(CONFIG.RETURN_DELAY)
-
-    -- Проверяем, жив ли ещё персонаж
-    local stillAlive = localChar
-        and localChar.Parent
-        and localHRP.Parent == localChar
-
-    if stillAlive then
-        -- Возврат на исходную позицию
-        localHRP.CFrame = originCFrame
-    end
-
-    -- Даём системе «успокоиться» перед снятием флага
-    task.wait(0.05)
-    State.isTeleporting = false
-end
-
--- ┌─────────────────────────────────────────────────────────┐
--- │          ПОДКЛЮЧЕНИЕ/ОТКЛЮЧЕНИЕ ИНСТРУМЕНТА             │
--- └─────────────────────────────────────────────────────────┘
-
---- Навесить обработчик Activated на атакующий инструмент
-local function hookTool(tool)
-    if not isAttackTool(tool.Name) then return end
-
-    cleanupConnections(State.toolConnections)
-
-    local conn = tool.Activated:Connect(function()
-        if not _G.PVP then return end
-        local char, hrp = getLocalCharacter()
-        if not char then return end
-        performAttack(char, hrp)
-    end)
-    table.insert(State.toolConnections, conn)
-end
-
---- Отслеживать экипировку/снятие инструментов персонажа
-local function watchCharacterTools(character)
-    -- Уже экипированный инструмент (при ресете персонаж создаётся заново)
-    for _, child in ipairs(character:GetChildren()) do
-        if child:IsA("Tool") then hookTool(child) end
-    end
-
-    -- Новые инструменты
-    local addedConn = character.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then hookTool(child) end
-    end)
-    local removedConn = character.ChildRemoved:Connect(function(child)
-        if child:IsA("Tool") then
-            cleanupConnections(State.toolConnections)
-        end
-    end)
-    table.insert(State.connections, addedConn)
-    table.insert(State.connections, removedConn)
-end
-
--- ┌─────────────────────────────────────────────────────────┐
--- │            ОСНОВНОЙ HEARTBEAT LOOP                      │
--- └─────────────────────────────────────────────────────────┘
-
-local heartbeatConn = RunService.Heartbeat:Connect(function()
-    -- Скрипт работает только при PVP = true
+--- Исполняется при активации Tool (ЛКМ).
+--- Телепортирует нас за спину ближайшего врага, удерживает ATTACK_DURATION сек,
+--- затем возвращает на исходную позицию.
+local function doBlinkAttack()
+    -- Не атакуем, если уже атакуем или уклоняемся
+    if isAttacking or isDodging then return end
+    -- Скрипт работает только при _G.PVP == true
     if not _G.PVP then return end
-    antiAttackStep()
-end)
-table.insert(State.connections, heartbeatConn)
 
--- ┌─────────────────────────────────────────────────────────┐
--- │            СЛЕЖЕНИЕ ЗА ПЕРСОНАЖЕМ (RESPAWN)             │
--- └─────────────────────────────────────────────────────────┘
+    local myRoot = getRootPart(LocalPlayer)
+    if not myRoot then return end
 
-local function onCharacterAdded(character)
-    -- Сбрасываем состояние при ресете
-    State.isTeleporting  = false
-    State.lastAttackTime = 0
-    cleanupConnections(State.toolConnections)
+    local targetPlayer, targetRoot = findNearestEnemy(CONFIG.ATTACK_RADIUS)
+    if not targetPlayer or not targetRoot then return end
 
-    -- Ждём полной загрузки персонажа
-    character:WaitForChild("HumanoidRootPart", 10)
-    character:WaitForChild("Humanoid", 10)
+    -- Запоминаем исходную позицию
+    local originPosition = myRoot.Position
 
-    watchCharacterTools(character)
+    -- Вычисляем позицию за спиной
+    local behindPos = getBehindPosition(targetRoot, CONFIG.BEHIND_OFFSET)
+    local _, safeDest = findSafePosition(myRoot.Position, behindPos)
+
+    -- Устанавливаем флаги
+    isAttacking  = true
+    attackTarget = targetPlayer
+
+    -- Телепортируемся за спину, смотрим на врага
+    teleportTo(safeDest, targetRoot.Position)
+
+    -- ── Target Tracking: прилипаем к спине в течение ATTACK_DURATION ──
+    local elapsed = 0
+    local connection: RBXScriptConnection
+
+    connection = RunService.Heartbeat:Connect(function(dt)
+        -- Прерываем, если PVP выключили во время атаки
+        if not _G.PVP then
+            connection:Disconnect()
+            isAttacking  = false
+            attackTarget = nil
+            return
+        end
+
+        elapsed += dt
+        if elapsed >= CONFIG.ATTACK_DURATION then
+            connection:Disconnect()
+
+            -- Возвращаемся на исходную позицию (или ближайшую безопасную)
+            local _, safeOrigin = findSafePosition(
+                getRootPart(LocalPlayer) and getRootPart(LocalPlayer).Position or originPosition,
+                originPosition
+            )
+            teleportTo(safeOrigin)
+
+            -- Снимаем флаги
+            isAttacking  = false
+            attackTarget = nil
+            return
+        end
+
+        -- Обновляем позицию: цель могла сдвинуться
+        local currentRoot = getRootPart(targetPlayer)
+        if not currentRoot then
+            -- Цель умерла или вышла — возвращаемся
+            connection:Disconnect()
+            local _, safeOrigin = findSafePosition(
+                getRootPart(LocalPlayer) and getRootPart(LocalPlayer).Position or originPosition,
+                originPosition
+            )
+            teleportTo(safeOrigin)
+            isAttacking  = false
+            attackTarget = nil
+            return
+        end
+
+        local newBehind = getBehindPosition(currentRoot, CONFIG.BEHIND_OFFSET)
+        local _, newSafe = findSafePosition(
+            getRootPart(LocalPlayer) and getRootPart(LocalPlayer).Position or newBehind,
+            newBehind
+        )
+        teleportTo(newSafe, currentRoot.Position)
+    end)
 end
 
--- Подключаем для текущего и будущих персонажей
+-- ============================================================
+--  АВТО-ДОДЖ
+-- ============================================================
+
+--- Вызывается из главного цикла при обнаружении угрозы.
+--- Телепортирует LocalPlayer в безопасную точку подальше от врага.
+local function doDodge(threatRoot: BasePart)
+    if isDodging or isAttacking then return end
+
+    local myRoot = getRootPart(LocalPlayer)
+    if not myRoot then return end
+
+    isDodging = true
+
+    -- Направление ОТСТУПЛЕНИЯ: от врага к нам, затем за нас
+    local awayDir = (myRoot.Position - threatRoot.Position).Unit
+    local dodgeTarget = myRoot.Position + awayDir * (CONFIG.DODGE_RADIUS * 1.5)
+
+    -- Raycast-проверка, чтобы не влететь в стену
+    local _, safeDest = findSafePosition(myRoot.Position, dodgeTarget)
+
+    teleportTo(safeDest)
+
+    -- Короткий кулдаун, чтобы не спамить доджи подряд
+    task.delay(0.3, function()
+        isDodging = false
+    end)
+end
+
+-- ============================================================
+--  ПОДКЛЮЧЕНИЕ К ИНСТРУМЕНТАМ ЛОКАЛЬНОГО ИГРОКА
+-- ============================================================
+
+--- Вешает Activated на Tool, если его имя в списке CONFIG.TOOL_NAMES.
+local function hookTool(tool: Tool)
+    if not CONFIG.TOOL_NAMES[tool.Name] then return end
+
+    tool.Activated:Connect(function()
+        if _G.PVP then
+            task.spawn(doBlinkAttack)
+        end
+    end)
+end
+
+--- Отслеживаем экипировку/деэкипировку инструментов у LocalPlayer.
+local function watchCharacter(character: Model)
+    -- Инструменты, экипированные прямо сейчас
+    for _, obj in character:GetChildren() do
+        if obj:IsA("Tool") then
+            hookTool(obj :: Tool)
+        end
+    end
+
+    -- Инструменты, добавляемые позже
+    character.ChildAdded:Connect(function(obj)
+        if obj:IsA("Tool") then
+            hookTool(obj :: Tool)
+        end
+    end)
+end
+
+-- Применяем к уже загруженному персонажу
 if LocalPlayer.Character then
-    task.spawn(onCharacterAdded, LocalPlayer.Character)
+    watchCharacter(LocalPlayer.Character)
 end
-local charAddedConn = LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-table.insert(State.connections, charAddedConn)
+-- И к будущим (после смерти/респауна)
+LocalPlayer.CharacterAdded:Connect(watchCharacter)
 
--- ┌─────────────────────────────────────────────────────────┐
--- │            CLEANUP ПРИ ВЫХОДЕ / ОТКЛЮЧЕНИИ              │
--- └─────────────────────────────────────────────────────────┘
+-- ============================================================
+--  ГЛАВНЫЙ ЦИКЛ: АВТО-ДОДЖ (проверка каждые ~0.05 с)
+-- ============================================================
 
--- При выходе игрока — чистим всё
-local removingConn = Players.PlayerRemoving:Connect(function(player)
-    if player == LocalPlayer then
-        cleanupConnections(State.toolConnections)
-        cleanupConnections(State.connections)
+-- Используем Heartbeat — самое частое событие, не требует sleep-цикла
+RunService.Heartbeat:Connect(function()
+    -- Выключено — ничего не делаем
+    if not _G.PVP then return end
+    -- Мы уже уклоняемся или атакуем — пропускаем
+    if isDodging or isAttacking then return end
+
+    local myRoot = getRootPart(LocalPlayer)
+    if not myRoot then return end
+
+    for _, player in Players:GetPlayers() do
+        if player == LocalPlayer then continue end
+        -- Пропускаем текущую цель атаки (анти-глитч)
+        if player == attackTarget then continue end
+
+        local enemyRoot = getRootPart(player)
+        if not enemyRoot then continue end
+
+        -- Проверяем дистанцию
+        local dist = (enemyRoot.Position - myRoot.Position).Magnitude
+        if dist > CONFIG.DODGE_RADIUS then continue end
+
+        -- Проверяем наличие опасного инструмента
+        if not hasDangerousTool(player) then continue end
+
+        -- Угроза обнаружена — уклоняемся
+        task.spawn(doDodge, enemyRoot)
+        break -- Обрабатываем одну угрозу за раз
     end
 end)
--- (removingConn сам по себе не нужно хранить — процесс всё равно умирает)
 
 -- ============================================================
---  Использование:
---    _G.PVP = true   → включить скрипт
---    _G.PVP = false  → выключить (по умолчанию)
+--  ИНИЦИАЛИЗАЦИЯ _G.PVP
 -- ============================================================
-_G.PVP = _G.PVP or false
+-- По умолчанию скрипт ВЫКЛЮЧЕН. Включить: _G.PVP = true
+if _G.PVP == nil then
+    _G.PVP = false
+end
+
 print("[PVP Script] Загружен. _G.PVP =", _G.PVP)
+print("[PVP Script] Для включения выполните: _G.PVP = true")
