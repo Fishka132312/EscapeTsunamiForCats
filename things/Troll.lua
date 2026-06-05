@@ -1,4 +1,4 @@
-local Players         = game:GetService("Players")
+local Players         = game:GetService("Players") --да
 local Workspace       = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -47,20 +47,27 @@ end
 -- Поиск доступных петов на карте
 local function getAvailablePets()
     local validPets = {}
-    for rarityName, isTarget in pairs(TARGET_RARITIES) do
-        if isTarget then
-            local rarityFolder = ItemSpawners:FindFirstChild(rarityName)
-            if rarityFolder then
-                for _, pet in ipairs(rarityFolder:GetChildren()) do
-                    local head = pet:FindFirstChild("Head")
-                    local prompt = head and head:FindFirstChildOfClass("ProximityPrompt")
-                    if head and prompt then
-                        table.insert(validPets, { Item = pet, Head = head, Prompt = prompt })
-                    end
+    
+    -- Проходимся по ВСЕМ объектам (папкам) внутри ItemSpawners
+    for _, rarityFolder in ipairs(ItemSpawners:GetChildren()) do
+        -- Проверяем, включена ли эта редкость в настройках TARGET_RARITIES
+        if TARGET_RARITIES[rarityFolder.Name] then
+            -- Если папка подходит, собираем из неё всех петов
+            for _, pet in ipairs(rarityFolder:GetChildren()) do
+                local head = pet:FindFirstChild("Head")
+                local prompt = head and head:FindFirstChildOfClass("ProximityPrompt")
+                
+                if head and prompt then
+                    table.insert(validPets, { 
+                        Item = pet, 
+                        Head = head, 
+                        Prompt = prompt 
+                    })
                 end
             end
         end
     end
+    
     return validPets
 end
 
