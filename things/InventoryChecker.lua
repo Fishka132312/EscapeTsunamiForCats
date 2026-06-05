@@ -1,6 +1,6 @@
--- ╔══════════════════════════════════════════════════════════╗
+-- ╔══════════════════════════════════════════════════════════╗ ццц
 -- ║          PET INVENTORY VIEWER  —  LocalScript            ║
--- ║  Вставь в StarterPlayerScripts или запусти через executor ║
+-- ║  Вставь в StarterPlayerScripts или запусти через executor║
 -- ╚══════════════════════════════════════════════════════════╝
 
 local Players      = game:GetService("Players")
@@ -93,110 +93,106 @@ end
 --  ЧТЕНИЕ ПЕТОВ ИЗ БЕКПАКА
 -- ─────────────────────────────────────────────────────────────
 local function readPets(player)
-    local bp = player:FindFirstChild("Backpack")
-    if not bp then return {} end
+    local bp = player:FindFirstChild("Backpack") [cite: 7]
+    if not bp then return {} end [cite: 7]
 
-    local pets = {}
-    local countMap = {}   -- name+mutation -> count
+    local pets = {} [cite: 7]
+    local countMap = {}   -- name+mutation -> count [cite: 7]
 
-    for _, tool in ipairs(bp:GetChildren()) do
-        if tool:IsA("Tool") and not IGNORE_TOOLS[tool.Name] then
-            local ok, err = pcall(function()
-            -- InfoGUI
-            local infoGUI = tool:FindFirstChild("InfoGUI")
-            if infoGUI then
-                local earnings = ""
-                local mutation = "Normal"
-                local petName  = tool.Name
-                local rarity   = "Common"
+    for _, tool in ipairs(bp:GetChildren()) do [cite: 7]
+        if tool:IsA("Tool") and not IGNORE_TOOLS[tool.Name] then [cite: 7]
+            local ok, err = pcall(function() [cite: 8]
+                -- InfoGUI
+                local infoGUI = tool:FindFirstChild("InfoGUI") [cite: 8]
+                if infoGUI then [cite: 8]
+                    local earnings = "" [cite: 8]
+                    local mutation = "Normal" [cite: 8]
+                    local petName  = tool.Name [cite: 8, 9]
+                    local rarity   = "Common" [cite: 9]
 
-                for _, child in ipairs(infoGUI:GetDescendants()) do
-                    -- Безопасно читаем .Text только у TextLabel/TextBox
-                    if not (child:IsA("TextLabel") or child:IsA("TextBox")) then continue end
-                    local txt = child.Text
-                    if type(txt) ~= "string" or txt == "" then continue end
-                    local trimmed = txt:match("^%s*(.-)%s*$") -- убираем пробелы
+                    for _, child in ipairs(infoGUI:GetDescendants()) do [cite: 9]
+                        -- Безопасно читаем .Text только у TextLabel/TextBox
+                        if not (child:IsA("TextLabel") or child:IsA("TextBox")) then continue end [cite: 9, 10]
+                        
+                        local txt = child.Text [cite: 10]
+                        if type(txt) ~= "string" or txt == "" then continue end [cite: 10]
+                        local trimmed = txt:match("^%s*(.-)%s*$") -- убираем пробелы [cite: 10]
 
-                    -- По имени объекта (точное совпадение)
-                    local n = child.Name
-                    if n == "Earnings" then
-                        earnings = trimmed
-                    elseif n == "Mutation" then
-                        if trimmed ~= "" then mutation = trimmed end
-                    elseif n == "Name" then
-                        if trimmed ~= "" then petName = trimmed end
-                    elseif n == "Rarity" then
-                        if trimmed ~= "" then rarity = trimmed end
-                    end
+                        -- По имени объекта (точное совпадение)
+                        local n = child.Name [cite: 10, 11]
+                        if n == "Earnings" then [cite: 11]
+                            earnings = trimmed [cite: 11]
+                        elseif n == "Mutation" then [cite: 11]
+                            if trimmed ~= "" then mutation = trimmed end [cite: 11, 12]
+                        elseif n == "Name" then [cite: 12]
+                            if trimmed ~= "" then petName = trimmed end [cite: 12]
+                        elseif n == "Rarity" then [cite: 13]
+                            if trimmed ~= "" then rarity = trimmed end [cite: 13]
+                        end
 
-                    -- По содержимому (формат "Ключ: Значение")
-                    local k, v = trimmed:match("^([%a]+):%s*(.+)$")
-                    if k and v then
-                        k = k:lower()
-                        if k == "earnings" then earnings = v
-                        elseif k == "mutation" and v ~= "" then mutation = v
-                        elseif k == "rarity"   and v ~= "" then rarity   = v
-                        elseif k == "name"     and v ~= "" then petName  = v
+                        -- По содержимому (формат "Ключ: Значение")
+                        local k, v = trimmed:match("^([%a]+):%s*(.+)$") [cite: 13, 14]
+                        if k and v then [cite: 14]
+                            k = k:lower() [cite: 14]
+                            if k == "earnings" then earnings = v [cite: 14]
+                            elseif k == "mutation" and v ~= "" then mutation = v [cite: 14, 15]
+                            elseif k == "rarity"   and v ~= "" then rarity   = v [cite: 15]
+                            elseif k == "name"     and v ~= "" then petName  = v [cite: 15, 16]
+                            end
                         end
                     end
-                end
 
-                -- Изображение из Open This -> Paste the link to the image in here
-                local imageId = ""
-                local openThis = tool:FindFirstChild("Open This")
-                if openThis then
-                    local imgPart = openThis:FindFirstChild("Paste the link to the image in here")
-                    if imgPart then
-                        -- Может быть Decal или StringValue
-                        if imgPart:IsA("Decal") then
-                            imageId = imgPart.Texture
-                        elseif imgPart:IsA("StringValue") then
-                            imageId = imgPart.Value
-                        elseif imgPart:IsA("ImageLabel") then
-                            imageId = imgPart.Image
-                        else
-                            -- Пробуем .Texture / .Image / .Value
-                            imageId = (imgPart:FindFirstChild("Texture") and imgPart.Texture)
-                                   or (imgPart:FindFirstChild("Image")   and imgPart.Image)
-                                   or ""
+                    -- ИЗОБРАЖЕНИЕ ПЕТА (Безопасное чтение через проверки IsA)
+                    local imageId = "" [cite: 16, 17]
+                    local openThis = tool:FindFirstChild("Open This") [cite: 17]
+                    if openThis then [cite: 17]
+                        local imgPart = openThis:FindFirstChild("Paste the link to the image in here") [cite: 17]
+                        if imgPart then [cite: 17, 18]
+                            if imgPart:IsA("Decal") then [cite: 18]
+                                imageId = imgPart.Texture [cite: 18]
+                            elseif imgPart:IsA("ImageLabel") or imgPart:IsA("ImageButton") then [cite: 19, 20]
+                                imageId = imgPart.Image [cite: 20]
+                            elseif imgPart:IsA("StringValue") or imgPart:IsA("ObjectValue") then [cite: 19]
+                                imageId = tostring(imgPart.Value) [cite: 19]
+                            end
                         end
                     end
-                end
 
-                -- Нормализуем
-                if mutation == "" then mutation = "Normal" end
-                if rarity   == "" then rarity   = "Common" end
+                    -- Нормализуем
+                    if mutation == "" then mutation = "Normal" end [cite: 22]
+                    if rarity   == "" then rarity   = "Common" end [cite: 22]
 
-                local key = petName .. "|" .. mutation
-                countMap[key] = (countMap[key] or 0) + 1
+                    local key = petName .. "|" .. mutation [cite: 23]
+                    countMap[key] = (countMap[key] or 0) + 1 [cite: 23]
 
-                table.insert(pets, {
-                    name     = petName,
-                    rarity   = rarity,
-                    mutation = mutation,
-                    earnings = earnings,
-                    image    = imageId,
-                    key      = key,
-                })
-            end -- if infoGUI
+                    table.insert(pets, { [cite: 23]
+                        name     = petName, [cite: 23]
+                        rarity   = rarity, [cite: 24]
+                        mutation = mutation, [cite: 24]
+                        earnings = earnings, [cite: 24]
+                        image    = imageId, [cite: 24]
+                        key      = key, [cite: 24, 25]
+                    })
+                end -- if infoGUI
             end) -- pcall
-            if not ok then
-                warn("[PetViewer] Ошибка чтения tool '" .. tool.Name .. "': " .. tostring(err))
-            end
-        end
-    end
+            
+            if not ok then [cite: 25]
+                warn("[PetViewer] Ошибка чтения tool '" .. tool.Name .. "': " .. tostring(err)) [cite: 25]
+            end [cite: 26]
+        end [cite: 26]
+    end [cite: 26]
 
     -- Дедупликация — оставляем уникальные (name+mutation), добавляем count
-    local seen   = {}
-    local result = {}
-    for _, p in ipairs(pets) do
-        if not seen[p.key] then
-            seen[p.key] = true
-            p.count = countMap[p.key]
-            table.insert(result, p)
-        end
-    end
-    return result
+    local seen   = {} [cite: 26]
+    local result = {} [cite: 26]
+    for _, p in ipairs(pets) do [cite: 26]
+        if not seen[p.key] then [cite: 26]
+            seen[p.key] = true [cite: 26]
+            p.count = countMap[p.key] [cite: 26]
+            table.insert(result, p) [cite: 27]
+        end [cite: 27]
+    end [cite: 27]
+    return result [cite: 27]
 end
 
 -- ─────────────────────────────────────────────────────────────
@@ -206,25 +202,33 @@ local function sortPets(pets, mode)
     local sorted = table.clone(pets)
     if mode == "rarity" then
         table.sort(sorted, function(a, b)
-            local ra = RARITY_ORDER[a.rarity]   or 99
-            local rb = RARITY_ORDER[b.rarity]   or 99
-            if ra ~= rb then return ra < rb end
-            return a.name < b.name
+            local ra = RARITY_ORDER[a.rarity] or 99
+            local rb = RARITY_ORDER[b.rarity] or 99
+            if ra ~= rb then 
+                return ra < rb 
+            end
+            return a.name:lower() < b.name:lower()
         end)
     elseif mode == "mutation" then
         table.sort(sorted, function(a, b)
             local ma = MUTATION_ORDER[a.mutation] or 99
             local mb = MUTATION_ORDER[b.mutation] or 99
-            if ma ~= mb then return ma < mb end
-            return a.name < b.name
+            if ma ~= mb then 
+                return ma < mb 
+            end
+            return a.name:lower() < b.name:lower()
         end)
     elseif mode == "count" then
         table.sort(sorted, function(a, b)
-            if a.count ~= b.count then return a.count > b.count end
-            return a.name < b.name
+            if a.count ~= b.count then 
+                return a.count > b.count 
+            end
+            return a.name:lower() < b.name:lower()
         end)
-    else  -- "name"
-        table.sort(sorted, function(a, b) return a.name < b.name end)
+    else -- "name"
+        table.sort(sorted, function(a, b) 
+            return a.name:lower() < b.name:lower() 
+        end)
     end
     return sorted
 end
@@ -718,6 +722,7 @@ local function buildPlayerButton(player)
 end
 
 local function refreshPlayerList()
+    selectedPlayerBtn = nil -- Сбрасываем ссылку перед удалением кнопок
     for _, child in ipairs(playerScroll:GetChildren()) do
         if child:IsA("TextButton") then child:Destroy() end
     end
@@ -746,24 +751,31 @@ local isOpen = false
 
 local function openGUI()
     isOpen = true
-    overlay.Visible  = true
+    overlay.Visible = true
     mainFrame.Visible = true
-    mainFrame.Size    = UDim2.new(0, 820, 0, 560)
-    mainFrame.BackgroundTransparency = 1
-    tween(overlay, {BackgroundTransparency = 0.55}, 0.3)
-    tween(mainFrame, {BackgroundTransparency = 0, Size = UDim2.new(0, 820, 0, 560)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    
+    -- Сбрасываем размер в 0 для эффекта появления
+    mainFrame.Size = UDim2.new(0, 0, 0, 0)
+    overlay.BackgroundTransparency = 1
+    
+    tween(overlay, {BackgroundTransparency = 0.55}, 0.25)
+    tween(mainFrame, {Size = UDim2.new(0, 820, 0, 560)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    
     refreshPlayerList()
 end
 
 local function closeGUI()
     isOpen = false
-    tween(overlay, {BackgroundTransparency = 1}, 0.25)
-    tween(mainFrame, {BackgroundTransparency = 1}, 0.25)
-    task.wait(0.28)
-    overlay.Visible   = false
-    mainFrame.Visible = false
-    currentPets       = {}
-    selectedPlayerBtn = nil
+    tween(overlay, {BackgroundTransparency = 1}, 0.2)
+    tween(mainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    
+    task.wait(0.22)
+    if not isOpen then -- Проверка, чтобы не сломать, если резко открыли назад
+        overlay.Visible   = false
+        mainFrame.Visible = false
+        currentPets       = {}
+        selectedPlayerBtn = nil
+    end
 end
 
 closeBtn.MouseButton1Click:Connect(closeGUI)
