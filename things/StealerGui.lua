@@ -1,4 +1,4 @@
---[[ да3
+--[[ да4
     ╔══════════════════════════════════════════════════════════════════╗
     ║              PET MONITOR — LocalScript v2.0                      ║
     ║  Мониторинг, фильтрация и кража петов в реальном времени         ║
@@ -977,7 +977,11 @@ function _G.PetMonitorRenderList()
     for pet, data in pairs(petCache) do
         -- Проверяем, существует ли пет физически в игре и проходит ли по фильтрам (например, только OG)
         if pet and pet.Parent and petPassesFilter(data) then
-            table.insert(filtered, { pet = pet, data = data })
+            -- Сразу обновляем данные перед вставкой, чтобы первый кадр был точным
+            local freshData = extractPetData(pet, data.rarityKey)
+            petCache[pet] = freshData
+            
+            table.insert(filtered, { pet = pet, data = freshData })
             filteredSet[pet] = true
         else
             -- Если пета удалили (забрали), чистим кэш
@@ -1028,7 +1032,7 @@ function _G.PetMonitorRenderList()
     end)
 
     -- ══════════════════════════════════════════════════════════════
-    -- ПОСТОЯННЫЙ ФОНОВЫЙ ЦИКЛ ОБНОВЛЕНИЯ (ПРАЙС-ЧЕК РАЗ В СЕКУНДУ)
+    -- НАСТОЯЩИЙ ЕЖЕСЕКУНДНЫЙ ПРАЙС-ЧЕК (ОБНОВЛЯЕТ ТОЛЬКО КАРТОЧКИ НА ЭКРАНЕ)
     -- ══════════════════════════════════════════════════════════════
     if not isLoopRunning then
         isLoopRunning = true
@@ -1036,10 +1040,47 @@ function _G.PetMonitorRenderList()
             while true do
                 task.wait(1.0) -- Ровно раз в секунду
                 
-                -- Вызываем этот же рендер. Теперь он гарантированно обновляет данные 
-                -- даже для тех петов, которые сейчас отфильтрованы и скрыты, 
-                -- а для активных (например, OG) — обновляет таймеры прямо на экране.
-                _G.PetMonitorRenderList()
+                -- 1. Быстрая проверка: не изменился ли состав петов на самой карте?
+                local checkZones = ItemSpawners:GetChildren()
+                local structureChanged = false
+                
+                for _, zone in ipairs(checkZones) do
+                    if RARITY_ORDER[zone.Name] then
+                        for _, pet in ipairs(zone:GetChildren()) do
+                            -- Если на карте появился пет, которого вообще нет в кэше — состав изменился
+                            if not petCache[pet] and pet:FindFirstChild("InfoGUI") then
+                                structureChanged = true
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                -- 2. Если на карте появился абсолютно новый пет — вызываем полный перерендер списков
+                if structureChanged then
+                    _G.PetMonitorRenderList()
+                else
+                    -- 3. ЕСЛИ СОСТАВ СТАБИЛЕН: Просто обновляем текст таймеров у тех, кто СЕЙЧАС НА ЭКРАНЕ
+                    -- Это предотвращает зависание UI и заставляет таймеры тикать плавно!
+                    for pet, card in pairs(cardFrames) do
+                        if pet and pet.Parent then
+                            -- Вытаскиваем свежайшие данные (таймер и цену) прямо из игры
+                            local newestData = extractPetData(pet, petCache[pet] and petCache[pet].rarityKey or "Common")
+                            
+                            -- Обновляем данные в кэше памяти
+                            if petCache[pet] then
+                                petCache[pet] = newestData
+                            end
+                            
+                            -- Напрямую пушим новое время в текстовые лейблы этой карточки
+                            updateCardDynamicData(card, newestData)
+                        else
+                            -- Если пет внезапно исчез из игры (его забрали) — вызываем полный рендер для очистки
+                            _G.PetMonitorRenderList()
+                            break
+                        end
+                    end
+                end
             end
         end)
     end
