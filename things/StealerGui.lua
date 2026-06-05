@@ -1,4 +1,4 @@
---[[ да4
+--[[ да5
     ╔══════════════════════════════════════════════════════════════════╗
     ║              PET MONITOR — LocalScript v2.0                      ║
     ║  Мониторинг, фильтрация и кража петов в реальном времени         ║
@@ -940,6 +940,26 @@ local function getCardSortOrder(data)
 
     -- LayoutOrder: редкость * 10000 + мутация * 1000 + таймер
     return rO * 10000 + mO * 1000 + math.floor(timerVal)
+end
+
+-- Функция для динамического обновления данных на карточке пета
+local function updateCardDynamicData(card, data)
+    if not card then return end
+    
+    local textBlock = card:FindFirstChild("TextBlock")
+    if textBlock then
+        -- Обновляем текст таймера
+        local timerLabel = textBlock:FindFirstChild("TimerLabel")
+        if timerLabel then
+            timerLabel.Text = "⏱ " .. (data.timerText or "—")
+        end
+        
+        -- Обновляем текст заработка (цены)
+        local earningsLabel = textBlock:FindFirstChild("EarningsLabel")
+        if earningsLabel then
+            earningsLabel.Text = "💰 " .. (data.earnings or "—")
+        end
+    end
 end
 
 local currentRenderId = 0
