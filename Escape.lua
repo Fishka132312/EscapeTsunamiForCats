@@ -2,8 +2,8 @@ local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/jen
 local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = false, SaveConfig = true, ConfigFolder = "StealAPushin"})
 
 local scripts = {
-    'Troll.lua', 
-	'PVP.lua',
+    'PVP.lua', 
+	'Troll.lua',
 }
 
 local baseUrl = 'https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/'
