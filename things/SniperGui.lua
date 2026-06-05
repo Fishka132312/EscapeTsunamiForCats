@@ -150,17 +150,63 @@ end
 -- ══════════════════════════════════════════════════════════════
 
 local isStealing = false
+local gatheredCount = 0 -- Текущее количество петов в руках
 
+-- =======================================================================
+-- 1. ФУНКЦИЯ ПОЛУЧЕНИЯ МАКСИМАЛЬНОГО ЛИМИТА ИЗ UI
+-- =======================================================================
+local function getCurrentCarryLimit()
+    local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+    
+    local carryFrame = playerGui:FindFirstChild("GUI") 
+        and playerGui.GUI:FindFirstChild("Frames") 
+        and playerGui.GUI.Frames:FindFirstChild("Carry") 
+        and playerGui.GUI.Frames.Carry:FindFirstChild("Scrolling")
+
+    if carryFrame then
+        local upgradeTemplate = carryFrame:FindFirstChild("CarryUpgrade")
+        if upgradeTemplate then
+            local stats = upgradeTemplate:FindFirstChild("Stats")
+            if stats then
+                local beforeText = stats:FindFirstChild("Before") and stats.Before:FindFirstChild("Text")
+                
+                if beforeText and beforeText.Text then
+                    local limit = tonumber(beforeText.Text:match("%d+"))
+                    if limit then return limit end 
+                end
+            end
+        end
+    end
+    return 1 -- Безопасный лимит по умолчанию
+end
+
+-- =======================================================================
+-- 2. ФУНКЦИЯ ТЕЛЕПОРТА НА БАЗУ ДЛЯ РАЗГРУЗКИ
+-- =======================================================================
+local function teleportToSafeZone()
+    pcall(function()
+        Character       = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+        
+        print("[Sniper] Рюкзак забит. Разгрузка в SafeZone...")
+        HumanoidRootPart.CFrame = CFrame.new(getSafeZonePosition())
+        task.wait(1.5) -- Ждем, чтобы игра успела забрать петов и очистить инвентарь
+        gatheredCount = 0 -- Обнуляем счётчик
+    end)
+end
+
+-- =======================================================================
+-- 3. ИСПРАВЛЕННАЯ ФУНКЦИЯ КРАЖИ
+-- =======================================================================
 local function stealPet(pet, petData)
     if isStealing then return end
     isStealing = true
 
-    -- Обернули в pcall: если что-то пойдет не так (персонаж умрет или пет исчезнет),
-    -- скрипт не сломается, а isStealing гарантированно сбросится в false
     pcall(function()
-        -- Обновляем Character (мог респавниться)
         Character       = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+        local maxCarry = getCurrentCarryLimit()
 
         -- 1. Телепорт к пету
         if petData and petData.headPart and petData.headPart:IsDescendantOf(workspace) then
@@ -168,16 +214,21 @@ local function stealPet(pet, petData)
         end
         task.wait(STEAL_TELEPORT_WAIT)
 
-        -- 2. FireProximityPrompt
+        -- 2. Активация ProximityPrompt
         if petData and petData.prompt and petData.prompt:IsDescendantOf(workspace) then
             task.wait(STEAL_PROMPT_WAIT)
             fireproximityprompt(petData.prompt)
+            
+            gatheredCount = gatheredCount + 1 -- Увеличиваем счётчик подобранных петов
+            print("[Sniper] Подобрано: " .. tostring(gatheredCount) .. " / " .. tostring(maxCarry))
         end
 
         task.wait(STEAL_RETURN_WAIT)
 
-        -- 3. Телепорт в SafeZone
-        HumanoidRootPart.CFrame = CFrame.new(getSafeZonePosition())
+        -- 3. Проверка лимита: если забились, СРАЗУ летим на базу
+        if gatheredCount >= maxCarry then
+            teleportToSafeZone()
+        end
     end)
 
     isStealing = false
@@ -187,11 +238,9 @@ end
 local function petMatchesFilters(petData)
     if not petData then return false end
     
-    -- Проверка имени
     if not snipeAllPets then
         if not selectedPets[petData.name] then return false end
     end
-    -- Проверка мутации
     if not snipeAllMutations then
         if not selectedMutations[petData.mutation] then return false end
     end
@@ -202,6 +251,14 @@ end
 local function scanAndSnipe()
     while sniperActive do
         local targetFound = false
+        local maxCarry = getCurrentCarryLimit()
+
+        -- Проверка перед циклом: если забились в другом потоке, сначала чистим инвентарь
+        if gatheredCount >= maxCarry then
+            isStealing = true
+            teleportToSafeZone()
+            isStealing = false
+        end
 
         for _, folderName in ipairs(RARITY_FOLDERS) do
             local folder = ItemSpawners:FindFirstChild(folderName)
@@ -210,11 +267,11 @@ local function scanAndSnipe()
                     if pet:IsA("Model") then
                         local petData = extractPetData(pet, folderName)
                         
-                        -- Проверяем фильтры и не заняты ли мы сейчас кражей
-                        if petMatchesFilters(petData) and not isStealing then
+                        -- Проверяем фильтры, флаг кражи и свободное место
+                        if petMatchesFilters(petData) and not isStealing and gatheredCount < maxCarry then
                             targetFound = true
                             stealPet(pet, petData)
-                            break -- Прерываем внутренний цикл, чтобы обновить позицию персонажа
+                            break 
                         end
                     end
                 end
@@ -222,7 +279,6 @@ local function scanAndSnipe()
             if targetFound then break end
         end
         
-        -- Небольшая пауза между сканированиями карты, чтобы не лагал интерфейс и игра
         task.wait(0.5) 
     end
 end
@@ -239,21 +295,30 @@ local function connectSpawners()
         if folder then
             local conn = folder.ChildAdded:Connect(function(pet)
                 if not sniperActive then return end
-                task.wait(0.1)  -- ждём пока InfoGUI прогрузится
+                task.wait(0.1) 
                 
                 if pet:IsA("Model") then
                     local petData = extractPetData(pet, folderName)
                     if petMatchesFilters(petData) then
-                        -- Запуск в отдельном потоке (task.spawn), чтобы не блокировать ChildAdded
                         task.spawn(function()
-                            -- Если в этот момент скрипт уже что-то крадет, ждем своей очереди (макс 5 секунд)
                             local timeout = 0
                             while isStealing and timeout < 5 do
                                 task.wait(0.1)
                                 timeout = timeout + 0.1
                             end
-                            -- Когда освободились — забираем пета
-                            stealPet(pet, petData)
+                            
+                            -- Проверяем лимит перед тем, как среагировать на новый спавн
+                            local maxCarry = getCurrentCarryLimit()
+                            if gatheredCount < maxCarry then
+                                stealPet(pet, petData)
+                            else
+                                -- Если места нет, просто отправляем на разгрузку
+                                if not isStealing then
+                                    isStealing = true
+                                    teleportToSafeZone()
+                                    isStealing = false
+                                end
+                            end
                         end)
                     end
                 end
