@@ -1,4 +1,4 @@
---[[ да
+--[[ да1
     ╔══════════════════════════════════════════════════════════════════╗
     ║              PET MONITOR — LocalScript v2.0                     ║
     ║  Мониторинг, фильтрация и кража петов в реальном времени        ║
@@ -943,6 +943,7 @@ local function getCardSortOrder(data)
 end
 
 local currentRenderId = 0
+local isLoopRunning = false -- Флаг защиты от создания сотен фоновых циклов
 
 function _G.PetMonitorRenderList()
     currentRenderId = currentRenderId + 1
@@ -951,13 +952,11 @@ function _G.PetMonitorRenderList()
     -- ══════════════════════════════════════════════════════════════
     -- ФОРСИРОВАННЫЙ СБОР ВСЕХ ПЕТОВ С КАРТЫ (ДЛЯ МГНОВЕННОГО ОБНОВЛЕНИЯ)
     -- ══════════════════════════════════════════════════════════════
-    -- Сканируем все парты/зоны в ItemSpawners прямо в момент клика
     local allZones = ItemSpawners:GetChildren()
     for _, zone in ipairs(allZones) do
         local rarKey = zone.Name
         if RARITY_ORDER[rarKey] then
             for _, pet in ipairs(zone:GetChildren()) do
-                -- Если пета нет в кэше, но у него уже догрузился InfoGUI — принудительно забираем его
                 if not petCache[pet] and pet:FindFirstChild("InfoGUI") then
                     local data = extractPetData(pet, rarKey)
                     petCache[pet] = data
@@ -971,9 +970,12 @@ function _G.PetMonitorRenderList()
     local filteredSet = {}
     
     for pet, data in pairs(petCache) do
-        -- Проверяем, существует ли пет физически в игре (защита от фантомных карт)
         if pet and pet.Parent and petPassesFilter(data) then
-            table.insert(filtered, { pet = pet, data = data })
+            -- [ОБНОВЛЕНИЕ]: Считываем свежий таймер/деньги прямо из InfoGUI перед отрисовкой
+            local freshData = extractPetData(pet, data.rarityKey)
+            petCache[pet] = freshData -- сохраняем обновленные данные в кэш
+            
+            table.insert(filtered, { pet = pet, data = freshData })
             filteredSet[pet] = true
         else
             -- Если пета удалили или его забрали, чистим кэш
@@ -1003,7 +1005,6 @@ function _G.PetMonitorRenderList()
     -- 4. Рендерим список МГНОВЕННО и без задержек в цикле
     task.spawn(function()
         for i, entry in ipairs(filtered) do
-            -- Проверка: если за эту миллисекунду ты нажал другой фильтр — отменяем старый поток
             if currentRenderId ~= myRenderId then break end
 
             local pet = entry.pet
@@ -1022,6 +1023,22 @@ function _G.PetMonitorRenderList()
             end
         end
     end)
+
+    -- ══════════════════════════════════════════════════════════════
+    -- СЕКУНДНЫЙ АВТО-ОБНОВИТЕЛЬ (ЗАПУСКАЕТСЯ ОДИН РАЗ И ЖИВЕТ В ФОНЕ)
+    -- ══════════════════════════════════════════════════════════════
+    if not isLoopRunning then
+        isLoopRunning = true
+        task.spawn(function()
+            while true do
+                task.wait(1.0) -- Обновляем ровно 1 раз в секунду
+                
+                -- Вызываем этот же рендер. Он заново соберет свежие таймеры, 
+                -- удалит деспавнившихся и добавит новых петов.
+                _G.PetMonitorRenderList()
+            end
+        end)
+    end
 end
 
 --дщд
