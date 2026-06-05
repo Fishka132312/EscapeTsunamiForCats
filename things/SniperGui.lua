@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════
--- PET SNIPER v1.0 | LocalScriptфффывывывыв
+-- PET SNIPER v1.0 | LocalScripttttt
 -- ══════════════════════════════════════════════════════════════
 
 local Players            = game:GetService("Players")
@@ -467,10 +467,10 @@ tabLayout.FillDirection  = Enum.FillDirection.Horizontal
 tabLayout.Padding        = UDim.new(0, 6)
 tabLayout.Parent         = TabBar
 
-local tabNames = { "Петы", "Мутации", "Настройки" }
+local tabNames = { "Pets", "Mutations", "Settings" }
 local tabs     = {}
 local tabPages = {}
-local activeTab = "Петы"
+local activeTab = "Pets"
 
 for _, name in ipairs(tabNames) do
     local btn = Instance.new("TextButton")
@@ -494,7 +494,7 @@ for _, name in ipairs(tabNames) do
     page.Size             = UDim2.new(1, -20, 0, 360)
     page.Position         = UDim2.new(0, 10, 0, 125)
     page.BackgroundTransparency = 1
-    page.Visible          = (name == "Петы")
+    page.Visible          = (name == "Pets")
     page.Parent           = MainFrame
     tabPages[name] = page
 end
@@ -523,14 +523,14 @@ switchTab("Петы")
 -- СТРАНИЦА ПЕТОВ
 -- ══════════════════════════════════════════════════════════════
 
-local PetsPage = tabPages["Петы"]
+local PetsPage = tabPages["Pets"]
 
 -- Поиск
 local SearchBox = Instance.new("TextBox")
 SearchBox.Size             = UDim2.new(1, 0, 0, 30)
 SearchBox.Position         = UDim2.new(0, 0, 0, 0)
 SearchBox.BackgroundColor3 = Color3.fromRGB(30, 30, 42)
-SearchBox.PlaceholderText  = "🔍  Поиск пета..."
+SearchBox.PlaceholderText  = "🔍  Search Pets"
 SearchBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 120)
 SearchBox.Text             = ""
 SearchBox.TextColor3       = Color3.fromRGB(220, 220, 220)
@@ -549,7 +549,7 @@ local SelectAllBtn = Instance.new("TextButton")
 SelectAllBtn.Size             = UDim2.new(0, 100, 0, 26)
 SelectAllBtn.Position         = UDim2.new(0, 0, 0, 36)
 SelectAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-SelectAllBtn.Text             = "Все петы"
+SelectAllBtn.Text             = "All Pets"
 SelectAllBtn.TextColor3       = Color3.fromRGB(200, 200, 200)
 SelectAllBtn.TextSize         = 12
 SelectAllBtn.Font             = Enum.Font.Gotham
@@ -564,7 +564,7 @@ local ClearAllBtn = Instance.new("TextButton")
 ClearAllBtn.Size             = UDim2.new(0, 100, 0, 26)
 ClearAllBtn.Position         = UDim2.new(0, 108, 0, 36)
 ClearAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-ClearAllBtn.Text             = "Снять все"
+ClearAllBtn.Text             = "Clear All"
 ClearAllBtn.TextColor3       = Color3.fromRGB(200, 200, 200)
 ClearAllBtn.TextSize         = 12
 ClearAllBtn.Font             = Enum.Font.Gotham
@@ -746,12 +746,12 @@ end)
 -- СТРАНИЦА МУТАЦИЙ
 -- ══════════════════════════════════════════════════════════════
 
-local MutPage = tabPages["Мутации"]
+local MutPage = tabPages["Mutations"]
 
 local MutTitleLabel = Instance.new("TextLabel")
 MutTitleLabel.Size              = UDim2.new(1, 0, 0, 24)
 MutTitleLabel.BackgroundTransparency = 1
-MutTitleLabel.Text              = "Выбери мутации для снайпа:"
+MutTitleLabel.Text              = "Select mutations for snipe:"
 MutTitleLabel.TextColor3        = Color3.fromRGB(160, 160, 180)
 MutTitleLabel.TextSize          = 13
 MutTitleLabel.Font              = Enum.Font.Gotham
@@ -859,7 +859,7 @@ local MutSelectAll = Instance.new("TextButton")
 MutSelectAll.Size             = UDim2.new(0, 120, 0, 28)
 MutSelectAll.Position         = UDim2.new(0, 0, 0, 318)
 MutSelectAll.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-MutSelectAll.Text             = "Все мутации"
+MutSelectAll.Text             = "All Mutations"
 MutSelectAll.TextColor3       = Color3.fromRGB(200, 200, 200)
 MutSelectAll.TextSize         = 12
 MutSelectAll.Font             = Enum.Font.Gotham
@@ -882,7 +882,7 @@ local MutClearAll = Instance.new("TextButton")
 MutClearAll.Size             = UDim2.new(0, 120, 0, 28)
 MutClearAll.Position         = UDim2.new(0, 128, 0, 318)
 MutClearAll.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-MutClearAll.Text             = "Снять все"
+MutClearAll.Text             = "Clear All"
 MutClearAll.TextColor3       = Color3.fromRGB(200, 200, 200)
 MutClearAll.TextSize         = 12
 MutClearAll.Font             = Enum.Font.Gotham
@@ -905,7 +905,7 @@ end)
 -- СТРАНИЦА НАСТРОЕК
 -- ══════════════════════════════════════════════════════════════
 
-local SettingsPage = tabPages["Настройки"]
+local SettingsPage = tabPages["Settings"]
 
 local function createSettingRow(parent, yPos, label, default, onChanged)
     local row = Instance.new("Frame")
@@ -957,9 +957,9 @@ local function createSettingRow(parent, yPos, label, default, onChanged)
     return row
 end
 
-createSettingRow(SettingsPage, 0,   "Задержка ТП к пету (сек):",   STEAL_TELEPORT_WAIT, function(v) STEAL_TELEPORT_WAIT = v end)
-createSettingRow(SettingsPage, 44,  "Задержка промпта (сек):",      STEAL_PROMPT_WAIT,   function(v) STEAL_PROMPT_WAIT = v end)
-createSettingRow(SettingsPage, 88,  "Задержка возврата (сек):",     STEAL_RETURN_WAIT,   function(v) STEAL_RETURN_WAIT = v end)
+createSettingRow(SettingsPage, 0,   "Tp Dalay to pet (sec):",   STEAL_TELEPORT_WAIT, function(v) STEAL_TELEPORT_WAIT = v end)
+createSettingRow(SettingsPage, 44,  "Prompt Delay (sec):",      STEAL_PROMPT_WAIT,   function(v) STEAL_PROMPT_WAIT = v end)
+createSettingRow(SettingsPage, 88,  "Back Delay (sec):",     STEAL_RETURN_WAIT,   function(v) STEAL_RETURN_WAIT = v end)
 
 -- ── Инфо-блок ──────────────────────────────────────────────────
 
@@ -978,7 +978,7 @@ local InfoText = Instance.new("TextLabel")
 InfoText.Size              = UDim2.new(1, -16, 1, -8)
 InfoText.Position          = UDim2.new(0, 8, 0, 4)
 InfoText.BackgroundTransparency = 1
-InfoText.Text              = "ℹ️  Как использовать:\n1. Выбери нужных петов на вкладке Петы\n2. Выбери мутации на вкладке Мутации\n3. Нажми СТАРТ\n\nСкрипт сам телепортирует тебя к пету и в SafeZone."
+InfoText.Text              = "ℹ️  How to use:\n1. Select the necessary pets on the Pets tab\n2. Select mutations on the Mutations tab\n3. Press START\n\The script itself will teleport you to pet and SafeZone."
 InfoText.TextColor3        = Color3.fromRGB(140, 140, 160)
 InfoText.TextSize          = 12
 InfoText.Font              = Enum.Font.Gotham
@@ -995,7 +995,7 @@ local StartBtn = Instance.new("TextButton")
 StartBtn.Size             = UDim2.new(1, -20, 0, 42)
 StartBtn.Position         = UDim2.new(0, 10, 1, -52)
 StartBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 80)
-StartBtn.Text             = "▶  СТАРТ"
+StartBtn.Text             = "▶  Start"
 StartBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
 StartBtn.TextSize         = 15
 StartBtn.Font             = Enum.Font.GothamBold
@@ -1009,8 +1009,8 @@ StartCorner.Parent = StartBtn
 local function updateStartBtn()
     if sniperActive then
         StartBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-        StartBtn.Text             = "⏹  СТОП"
-        StatusLabel.Text          = "✅  Снайпер активен — ищу петов..."
+        StartBtn.Text             = "⏹  Stop"
+        StatusLabel.Text          = "✅  Status: Searching for pets..."
         StatusLabel.TextColor3    = Color3.fromRGB(80, 220, 100)
     else
         StartBtn.BackgroundColor3 = Color3.fromRGB(50, 160, 80)
@@ -1030,7 +1030,7 @@ StartBtn.MouseButton1Click:Connect(function()
     end
 
     if not hasPet then
-        StatusLabel.Text       = "⚠️  Выбери хотя бы одного пета!"
+        StatusLabel.Text       = "⚠️  Choose at least one pet!"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
         return
     end
@@ -1043,7 +1043,7 @@ StartBtn.MouseButton1Click:Connect(function()
     end
 
     if not hasMut then
-        StatusLabel.Text       = "⚠️  Выбери хотя бы одну мутацию!"
+        StatusLabel.Text       = "⚠️  Choose at least one mutation!"
         StatusLabel.TextColor3 = Color3.fromRGB(255, 180, 50)
         return
     end
@@ -1074,5 +1074,5 @@ LocalPlayer.CharacterAdded:Connect(function(char)
 end)
 
 -- Готово!
-StatusLabel.Text       = "⏹  Снайпер готов к работе"
+StatusLabel.Text       = "⏹  Status: Waiting..."
 StatusLabel.TextColor3 = Color3.fromRGB(160, 160, 180)
