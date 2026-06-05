@@ -3,6 +3,7 @@ local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = fal
 
 local scripts = {
     'Troll.lua', 
+	'PVP.lua',
 }
 
 local baseUrl = 'https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/'
