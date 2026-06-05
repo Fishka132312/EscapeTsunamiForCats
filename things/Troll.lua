@@ -16,9 +16,9 @@ local TARGET_RARITIES = {
 }
 
 -- Тайминги (задержки) для стабильной работы без киков
-local DELAY_AFTER_TP = 0.35   -- Задержка после ТП к пету
+local DELAY_AFTER_TP = 0.15   -- Задержка после ТП к пету
 local DELAY_PROMPT   = 0.15   -- Задержка промпта
-local DELAY_GIFT     = 0.4    -- Задержка между экипировкой тула и отправкой (чтобы игра засчитала предмет в руке)
+local DELAY_GIFT     = 0.1    -- Задержка между экипировкой тула и отправкой (чтобы игра засчитала предмет в руке)
 
 -- Функция получения лимита вместимости из UI
 local function getCurrentCarryLimit()
@@ -124,7 +124,7 @@ while true do
                     -- 2. Возврат в SafeZone
                     print("[Core] Сбор завершен. Возвращение на базу для разгрузки и дарения...")
                     HumanoidRootPart.CFrame = safeZoneCFrame
-                    task.wait(0.5)
+                    task.wait(0.1)
                     
                     -- 3. Процесс дарения собранных предметов
                     -- Ищем все инструменты (тулы) в Backpack, которые появились после сбора
@@ -152,7 +152,7 @@ while true do
                                     GiftRemote:FireServer(unpack({ targetPlayer }))
                                 end)
                                 
-                                task.wait(0.15)
+                                task.wait(0.01)
                                 
                                 -- Стреляем во второй ремонт (подтверждение)
                                 if success then
@@ -161,7 +161,7 @@ while true do
                                     end)
                                 end
                                 
-                                task.wait(0.3) -- Небольшая пауза между подарками, чтобы не крашнуть сервер
+                                task.wait(0.01) -- Небольшая пауза между подарками, чтобы не крашнуть сервер
                             end
                         end
                     end
