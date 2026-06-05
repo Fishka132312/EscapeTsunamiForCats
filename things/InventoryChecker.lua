@@ -45,15 +45,20 @@ local MUTATION_COLORS = {
 -- ─────────────────────────────────────────────────────────────
 --  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
 -- ─────────────────────────────────────────────────────────────
+local FALLBACK_COLOR = Color3.fromRGB(150, 150, 150)
+
 local function getRarityColor(rarity)
-    return RARITY_COLORS[rarity] or Color3.fromRGB(150, 150, 150)
+    if type(rarity) ~= "string" or rarity == "" then return FALLBACK_COLOR end
+    return RARITY_COLORS[rarity] or FALLBACK_COLOR
 end
 local function getMutationColor(mutation)
-    return MUTATION_COLORS[mutation] or Color3.fromRGB(150, 150, 150)
+    if type(mutation) ~= "string" or mutation == "" then return FALLBACK_COLOR end
+    return MUTATION_COLORS[mutation] or FALLBACK_COLOR
 end
 
 local function labelColor(c)
     -- делаем полупрозрачный вариант цвета для фона чипа
+    if typeof(c) ~= "Color3" then return Color3.fromRGB(25, 25, 40) end
     return Color3.fromRGB(
         math.floor(c.R * 255 * 0.22),
         math.floor(c.G * 255 * 0.22),
@@ -96,6 +101,7 @@ local function readPets(player)
 
     for _, tool in ipairs(bp:GetChildren()) do
         if tool:IsA("Tool") and not IGNORE_TOOLS[tool.Name] then
+            local ok, err = pcall(function()
             -- InfoGUI
             local infoGUI = tool:FindFirstChild("InfoGUI")
             if infoGUI then
@@ -104,17 +110,35 @@ local function readPets(player)
                 local petName  = tool.Name
                 local rarity   = "Common"
 
-                for _, child in ipairs(infoGUI:GetChildren()) do
-                    local txt = child.Text or (child:FindFirstChildOfClass("TextLabel") and child:FindFirstChildOfClass("TextLabel").Text) or ""
-                    -- Пробуем по Name атрибута
-                    if child.Name == "Earnings"  then earnings = child.Text or "" end
-                    if child.Name == "Mutation"  then mutation = child.Text or "" end
-                    if child.Name == "Name"      then petName  = child.Text or tool.Name end
-                    if child.Name == "Rarity"    then rarity   = child.Text or "" end
-                    -- Некоторые игры хранят значение как .Text напрямую
-                    -- Дополнительный поиск по содержимому
-                    if txt:find("^Earnings:") then earnings = txt:match("Earnings:%s*(.+)") or "" end
-                    if txt:find("^Mutation:") then mutation = txt:match("Mutation:%s*(.+)") or "" end
+                for _, child in ipairs(infoGUI:GetDescendants()) do
+                    -- Безопасно читаем .Text только у TextLabel/TextBox
+                    if not (child:IsA("TextLabel") or child:IsA("TextBox")) then continue end
+                    local txt = child.Text
+                    if type(txt) ~= "string" or txt == "" then continue end
+                    local trimmed = txt:match("^%s*(.-)%s*$") -- убираем пробелы
+
+                    -- По имени объекта (точное совпадение)
+                    local n = child.Name
+                    if n == "Earnings" then
+                        earnings = trimmed
+                    elseif n == "Mutation" then
+                        if trimmed ~= "" then mutation = trimmed end
+                    elseif n == "Name" then
+                        if trimmed ~= "" then petName = trimmed end
+                    elseif n == "Rarity" then
+                        if trimmed ~= "" then rarity = trimmed end
+                    end
+
+                    -- По содержимому (формат "Ключ: Значение")
+                    local k, v = trimmed:match("^([%a]+):%s*(.+)$")
+                    if k and v then
+                        k = k:lower()
+                        if k == "earnings" then earnings = v
+                        elseif k == "mutation" and v ~= "" then mutation = v
+                        elseif k == "rarity"   and v ~= "" then rarity   = v
+                        elseif k == "name"     and v ~= "" then petName  = v
+                        end
+                    end
                 end
 
                 -- Изображение из Open This -> Paste the link to the image in here
@@ -154,6 +178,10 @@ local function readPets(player)
                     image    = imageId,
                     key      = key,
                 })
+            end -- if infoGUI
+            end) -- pcall
+            if not ok then
+                warn("[PetViewer] Ошибка чтения tool '" .. tool.Name .. "': " .. tostring(err))
             end
         end
     end
