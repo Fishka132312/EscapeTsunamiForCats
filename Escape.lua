@@ -314,6 +314,67 @@ Tab:AddToggle({
     end    
 })
 
+local Tab = Window:MakeTab({
+	Name = "Troll",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+}) 
+
+-- Глобальные переменные для связи интерфейса с основным скриптом
+_G.SelectedPlayer = nil
+_G.AutoGiftEnabled = false
+
+-- Функция для получения списка ников всех игроков на сервере
+local function getPlayerNames()
+    local names = {}
+    for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+        -- Не добавляем самих себя в список подарков
+        if p ~= game:GetService("Players").LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    -- Если сервер пустой, добавим заглушку
+    if #names == 0 then table.insert(names, "Нет игроков") end
+    return names
+end
+
+-- Создаем Dropdown со списком игроков
+local PlayerDropdown = Tab:AddDropdown({
+    Name = "Выбрать игрока для подарка",
+    Default = "Выбери ник",
+    Options = getPlayerNames(),
+    Callback = function(Value)
+        if Value ~= "Выбери ник" and Value ~= "Нет игроков" then
+            _G.SelectedPlayer = Value
+            print("[UI] Выбран игрок для отправки:", _G.SelectedPlayer)
+        else
+            _G.SelectedPlayer = nil
+        end
+    end    
+})
+
+-- Обновление списка игроков при их входе или выходе
+local function refreshDropdown()
+    if PlayerDropdown and PlayerDropdown.Refresh then
+        PlayerDropdown:Refresh(getPlayerNames(), true)
+    end
+end
+game:GetService("Players").PlayerAdded:Connect(refreshDropdown)
+game:GetService("Players").PlayerRemoving:Connect(refreshDropdown)
+
+-- Создаем Toggle (выключатель) для старта автоматики
+Tab:AddToggle({
+    Name = "Запустить авто-сбор и дарение",
+    Default = false,
+    Callback = function(Value)
+        _G.AutoGiftEnabled = Value
+        if _G.AutoGiftEnabled then
+            print("[UI] Авто-фарм и дарение: ВКЛЮЧЕНО. Цель:", tostring(_G.SelectedPlayer))
+        else
+            print("[UI] Авто-фарм и дарение: ВЫКЛЮЧЕНО.")
+        end
+    end    
+})
 --------------------------------MISC-----------------------------
 
 local Tab = Window:MakeTab({
