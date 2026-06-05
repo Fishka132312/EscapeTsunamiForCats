@@ -1,5 +1,5 @@
 -- ══════════════════════════════════════════════════════════════
--- PET SNIPER v1.0 | LocalScript
+-- PET SNIPER v1.0 | LocalScript вф
 -- ══════════════════════════════════════════════════════════════
 
 local Players            = game:GetService("Players")
@@ -209,13 +209,17 @@ end
 
 -- Сканируем все папки ItemSpawners
 local function scanAndSnipe()
+    -- ЕСЛИ МЫ УЖЕ ЧТО-ТО КРАДЕМ, ПРЕКРАЩАЕМ СКАН, ПОКА НЕ ЗАКОНЧИМ!
+    if isStealing then return end 
+
     for _, folderName in ipairs(RARITY_FOLDERS) do
         local folder = ItemSpawners:FindFirstChild(folderName)
         if folder then
             for _, pet in ipairs(folder:GetChildren()) do
                 if pet:IsA("Model") then
                     local petData = extractPetData(pet, folderName)
-                    if petMatchesFilters(petData) then
+                    -- Проверяем еще раз флаг на случай, если он изменился внутри цикла
+                    if petMatchesFilters(petData) and not isStealing then
                         stealPet(pet, petData)
                         return  -- один за раз
                     end
