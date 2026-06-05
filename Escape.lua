@@ -439,12 +439,18 @@ Tab:AddToggle({
     end    
 })
 
+local Tab = Window:MakeTab({
+	Name = "Total Domination",
+	Icon = "rbxassetid://4483345998",
+	PremiumOnly = false
+}) 
+
 local Section = Tab:AddSection({
 	Name = "Total Domination"
 })
 
 Tab:AddToggle({
-	Name = "This is a toggle!",
+	Name = "Start",
 	Default = false,
 	Callback = function(Value)
 		_G.PVP = Value
