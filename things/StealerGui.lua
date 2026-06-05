@@ -1192,24 +1192,25 @@ local function watchFolder(folder, rarityKey)
     end)
 end
 
--- Подписываемся на все известные папки и на новые
+-- Подписываемся на ВСЕ зоны спавна (даже если их по 5 штук с одинаковыми именами)
 local function initFolderWatchers()
-    for _, rarKey in ipairs(RARITY_FOLDERS) do
-        local folder = ItemSpawners:FindFirstChild(rarKey)
-        if folder then
-            watchFolder(folder, rarKey)
+    -- Получаем абсолютно все объекты внутри ItemSpawners
+    local allChildren = ItemSpawners:GetChildren()
+    
+    for _, child in ipairs(allChildren) do
+        local rarKey = child.Name
+        -- Проверяем, входит ли имя объекта в наш список редкостей
+        if RARITY_ORDER[rarKey] then
+            -- Передаем конкретный парт-зону и его редкость в функцию отслеживания
+            watchFolder(child, rarKey)
         end
     end
 
-    -- Если появятся новые папки (на случай расширения)
+    -- Слушатель на случай, если игра динамически создаст новые зоны спавна во время работы
     ItemSpawners.ChildAdded:Connect(function(newFolder)
         local rarKey = newFolder.Name
-        -- Проверяем, есть ли мы его уже в нашем списке
-        local known = false
-        for _, k in ipairs(RARITY_FOLDERS) do
-            if k == rarKey then known = true break end
-        end
-        if known then
+        -- Быстрая проверка: если это зона с известной нам редкостью
+        if RARITY_ORDER[rarKey] then
             watchFolder(newFolder, rarKey)
         end
     end)
