@@ -1,843 +1,652 @@
--- ╔══════════════════════════════════════════════════════════╗ qqq
--- ║          PET INVENTORY VIEWER  —  LocalScript            ║
--- ║  Вставь в StarterPlayerScripts или запусти через executor║
--- ╚══════════════════════════════════════════════════════════╝
+-- ============================================================
+--  PetInventoryViewer  |  LocalScript → StarterGui / ScreenGui
+--  Просмотр инвентаря петов любого игрока на сервере
+-- ============================================================
 
 local Players      = game:GetService("Players")
-local RunService   = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer  = Players.LocalPlayer
 
 -- ─────────────────────────────────────────────────────────────
---  НАСТРОЙКИ
+--  КОНСТАНТЫ
 -- ─────────────────────────────────────────────────────────────
-local IGNORE_TOOLS = { Bat = true, Slap = true }
+local IGNORED_TOOLS = { Bat = true, Slap = true }
 
 local RARITY_ORDER = {
-    SpecialItemSpawn = 1, OG = 2, Mythical = 3, Legendary = 4,
-    Epic = 5, Rare = 6, Uncommon = 7, Common = 8,
-}
-local MUTATION_ORDER = {
-    Divine = 1, Neon = 2, Blood = 3, Rainbow = 4,
-    Ruby = 5, Diamond = 6, Golden = 7, Normal = 8,
+	SpecialItemSpawn = 1, OG = 2, Mythical = 3, Legendary = 4,
+	Epic = 5, Rare = 6, Uncommon = 7, Common = 8,
 }
 local RARITY_COLORS = {
-    Common           = Color3.fromRGB(180, 180, 180),
-    Uncommon         = Color3.fromRGB(71,  231, 160),
-    Rare             = Color3.fromRGB(0,   242, 255),
-    Epic             = Color3.fromRGB(255,  71, 255),
-    Legendary        = Color3.fromRGB(255, 162,   0),
-    Mythical         = Color3.fromRGB(255,  99, 152),
-    OG               = Color3.fromRGB(52,  214, 137),
-    SpecialItemSpawn = Color3.fromRGB(80,  220, 255),
+	Common          = Color3.fromRGB(180, 180, 180),
+	Uncommon        = Color3.fromRGB(71,  231, 160),
+	Rare            = Color3.fromRGB(0,   242, 255),
+	Epic            = Color3.fromRGB(255, 71,  255),
+	Legendary       = Color3.fromRGB(255, 162, 0),
+	Mythical        = Color3.fromRGB(255, 99,  152),
+	OG              = Color3.fromRGB(52,  214, 137),
+	SpecialItemSpawn= Color3.fromRGB(80,  220, 255),
+}
+local MUTATION_ORDER = {
+	Divine = 1, Neon = 2, Blood = 3, Rainbow = 4,
+	Ruby = 5, Diamond = 6, Golden = 7, Normal = 8,
 }
 local MUTATION_COLORS = {
-    Normal  = Color3.fromRGB(200, 200, 200),
-    Golden  = Color3.fromRGB(255, 247,   0),
-    Diamond = Color3.fromRGB(25,  255, 255),
-    Ruby    = Color3.fromRGB(255,  23,  55),
-    Rainbow = Color3.fromRGB(0,   255, 170),
-    Blood   = Color3.fromRGB(255,   0,   0),
-    Neon    = Color3.fromRGB(215, 255,   0),
-    Divine  = Color3.fromRGB(255, 232,  36),
+	Normal  = Color3.fromRGB(200, 200, 200),
+	Golden  = Color3.fromRGB(255, 247, 0),
+	Diamond = Color3.fromRGB(25,  255, 255),
+	Ruby    = Color3.fromRGB(255, 23,  55),
+	Rainbow = Color3.fromRGB(0,   255, 170),
+	Blood   = Color3.fromRGB(255, 0,   0),
+	Neon    = Color3.fromRGB(215, 255, 0),
+	Divine  = Color3.fromRGB(255, 232, 36),
 }
-
--- ─────────────────────────────────────────────────────────────
---  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
--- ─────────────────────────────────────────────────────────────
-local FALLBACK_COLOR = Color3.fromRGB(150, 150, 150)
-
-local function getRarityColor(rarity)
-    if type(rarity) ~= "string" or rarity == "" then return FALLBACK_COLOR end
-    return RARITY_COLORS[rarity] or FALLBACK_COLOR
-end
-local function getMutationColor(mutation)
-    if type(mutation) ~= "string" or mutation == "" then return FALLBACK_COLOR end
-    return MUTATION_COLORS[mutation] or FALLBACK_COLOR
-end
-
-local function labelColor(c)
-    -- делаем полупрозрачный вариант цвета для фона чипа
-    if typeof(c) ~= "Color3" then return Color3.fromRGB(25, 25, 40) end
-    return Color3.fromRGB(
-        math.floor(c.R * 255 * 0.22),
-        math.floor(c.G * 255 * 0.22),
-        math.floor(c.B * 255 * 0.22)
-    )
-end
-
-local function newCorner(r, parent)
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, r)
-    c.Parent = parent
-    return c
-end
-
-local function newStroke(thickness, color, transp, parent)
-    local s = Instance.new("UIStroke")
-    s.Thickness = thickness
-    s.Color = color
-    s.Transparency = transp or 0
-    s.Parent = parent
-    return s
-end
-
-local function tween(obj, props, t, style, dir)
-    TweenService:Create(obj,
-        TweenInfo.new(t or 0.25, style or Enum.EasingStyle.Quad, dir or Enum.EasingDirection.Out),
-        props
-    ):Play()
-end
-
--- ─────────────────────────────────────────────────────────────
---  ЧТЕНИЕ ПЕТОВ ИЗ БЕКПАКА
--- ─────────────────────────────────────────────────────────────
-local function readPets(player)
-    local bp = player:FindFirstChild("Backpack")
-    if not bp then return {} end
-
-    local pets = {}
-    local countMap = {}   -- name+mutation -> count
-
-    for _, tool in ipairs(bp:GetChildren()) do
-        if tool:IsA("Tool") and not IGNORE_TOOLS[tool.Name] then
-            local ok, err = pcall(function()
-                -- InfoGUI
-                local infoGUI = tool:FindFirstChild("InfoGUI")
-                if infoGUI then
-                    local earnings = ""
-                    local mutation = "Normal"
-                    local petName  = tool.Name
-                    local rarity   = "Common"
-
-                    for _, child in ipairs(infoGUI:GetDescendants()) do
-                        -- Безопасно читаем .Text только у TextLabel/TextBox
-                        if not (child:IsA("TextLabel") or child:IsA("TextBox")) then continue end
-                        
-                        local txt = child.Text
-                        if type(txt) ~= "string" or txt == "" then continue end
-                        -- Очищаем строку от любых пробелов, табов и переносов строк в начале/конце
-                        local trimmed = txt:match("^%s*(.-)%s*$")
-
-                        -- По имени объекта (точное совпадение)
-                        local n = child.Name
-                        if n == "Earnings" then
-                            earnings = trimmed
-                        elseif n == "Mutation" then
-                            if trimmed ~= "" then mutation = trimmed end
-                        elseif n == "Name" then
-                            if trimmed ~= "" then petName = trimmed end
-                        elseif n == "Rarity" then
-                            if trimmed ~= "" then rarity = trimmed end
-                        end
-
-                        -- По содержимому (формат "Ключ: Значение")
-                        local k, v = trimmed:match("^([%a]+):%s*(.+)$")
-                        if k and v then
-                            k = k:lower()
-                            v = v:match("^%s*(.-)%s*$") -- чистим значение от пробелов
-                            if k == "earnings" then earnings = v
-                            elseif k == "mutation" and v ~= "" then mutation = v
-                            elseif k == "rarity"   and v ~= "" then rarity   = v
-                            elseif k == "name"     and v ~= "" then petName  = v
-                            end
-                        end
-                    end
-
-                    -- ИЗОБРАЖЕНИЕ ПЕТА (Полностью безопасное чтение свойств)
-                    local imageId = ""
-                    local openThis = tool:FindFirstChild("Open This")
-                    if openThis then
-                        local imgPart = openThis:FindFirstChild("Paste the link to the image in here")
-                        if imgPart then
-                            -- Проверяем тип объекта через IsA, чтобы не читать несуществующие свойства
-                            if imgPart:IsA("Decal") then
-                                imageId = imgPart.Texture
-                            elseif imgPart:IsA("ImageLabel") or imgPart:IsA("ImageButton") then
-                                imageId = imgPart.Image
-                            elseif imgPart:IsA("StringValue") or imgPart:IsA("ObjectValue") then
-                                imageId = tostring(imgPart.Value)
-                            elseif imgPart:IsA("Texture") then
-                                imageId = imgPart.Texture
-                            elseif imgPart:IsA("MeshPart") then
-                                imageId = imgPart.TextureID
-                            elseif imgPart:IsA("SpecialMesh") then
-                                imageId = imgPart.TextureId
-                            end
-                        end
-                    end
-
-                    -- ЖЕСТКАЯ НОРМАЛИЗАЦИЯ (Защита от сбоев в таблицах сортировки)
-                    if not mutation or type(mutation) ~= "string" or mutation:match("^%s*$") then 
-                        mutation = "Normal" 
-                    else
-                        mutation = mutation:match("^%s*(.-)%s*$") -- убираем случайные пробелы
-                    end
-
-                    if not rarity or type(rarity) ~= "string" or rarity:match("^%s*$") then 
-                        rarity = "Common" 
-                    else
-                        rarity = rarity:match("^%s*(.-)%s*$") -- убираем случайные пробелы
-                    end
-
-                    local key = petName .. "|" .. mutation
-                    countMap[key] = (countMap[key] or 0) + 1
-
-                    table.insert(pets, {
-                        name     = petName,
-                        rarity   = rarity,
-                        mutation = mutation,
-                        earnings = earnings,
-                        image    = imageId,
-                        key      = key,
-                    })
-                end -- if infoGUI
-            end) -- pcall
-            
-            if not ok then
-                warn("[PetViewer] Ошибка чтения tool '" .. tool.Name .. "': " .. tostring(err))
-            end
-        end
-    end
-
-    -- Дедупликация — оставляем уникальные (name+mutation), добавляем count
-    local seen   = {}
-    local result = {}
-    for _, p in ipairs(pets) do
-        if not seen[p.key] then
-            seen[p.key] = true
-            p.count = countMap[p.key]
-            table.insert(result, p)
-        end
-    end
-    return result
-end
-
--- ─────────────────────────────────────────────────────────────
---  СОРТИРОВКА
--- ─────────────────────────────────────────────────────────────
-local function sortPets(pets, mode)
-    local sorted = table.clone(pets)
-    if mode == "rarity" then
-        table.sort(sorted, function(a, b)
-            local ra = RARITY_ORDER[a.rarity] or 99
-            local rb = RARITY_ORDER[b.rarity] or 99
-            if ra ~= rb then 
-                return ra < rb 
-            end
-            return a.name:lower() < b.name:lower()
-        end)
-    elseif mode == "mutation" then
-        table.sort(sorted, function(a, b)
-            local ma = MUTATION_ORDER[a.mutation] or 99
-            local mb = MUTATION_ORDER[b.mutation] or 99
-            if ma ~= mb then 
-                return ma < mb 
-            end
-            return a.name:lower() < b.name:lower()
-        end)
-    elseif mode == "count" then
-        table.sort(sorted, function(a, b)
-            if a.count ~= b.count then 
-                return a.count > b.count 
-            end
-            return a.name:lower() < b.name:lower()
-        end)
-    else -- "name"
-        table.sort(sorted, function(a, b) 
-            return a.name:lower() < b.name:lower() 
-        end)
-    end
-    return sorted
-end
 
 -- ─────────────────────────────────────────────────────────────
 --  ПОСТРОЕНИЕ GUI
 -- ─────────────────────────────────────────────────────────────
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name             = "PetInventoryViewer"
-screenGui.ResetOnSpawn     = false
-screenGui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
-screenGui.IgnoreGuiInset   = true
-screenGui.Parent           = LocalPlayer:WaitForChild("PlayerGui")
-
--- фон-затемнение
-local overlay = Instance.new("Frame")
-overlay.Name              = "Overlay"
-overlay.Size              = UDim2.fromScale(1, 1)
-overlay.BackgroundColor3  = Color3.new(0, 0, 0)
-overlay.BackgroundTransparency = 1
-overlay.Visible           = false
-overlay.ZIndex            = 10
-overlay.Parent            = screenGui
-
--- ══════════ ГЛАВНОЕ ОКНО ══════════
-local mainFrame = Instance.new("Frame")
-mainFrame.Name              = "MainFrame"
-mainFrame.Size              = UDim2.new(0, 820, 0, 560)
-mainFrame.AnchorPoint       = Vector2.new(0.5, 0.5)
-mainFrame.Position          = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.BackgroundColor3  = Color3.fromRGB(10, 11, 18)
-mainFrame.BorderSizePixel   = 0
-mainFrame.Visible           = false
-mainFrame.ZIndex            = 11
-mainFrame.Parent            = screenGui
-newCorner(16, mainFrame)
-newStroke(1.5, Color3.fromRGB(60, 65, 100), 0.2, mainFrame)
-
--- градиент сверху
-local topGrad = Instance.new("Frame")
-topGrad.Size              = UDim2.new(1, 0, 0, 3)
-topGrad.BackgroundColor3  = Color3.fromRGB(100, 120, 255)
-topGrad.BorderSizePixel   = 0
-topGrad.ZIndex            = 12
-topGrad.Parent            = mainFrame
-local tg = Instance.new("UIGradient")
-tg.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 80, 255)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(80, 160, 255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(60, 220, 200)),
-}
-tg.Parent = topGrad
-local topCorner = Instance.new("UICorner")
-topCorner.CornerRadius = UDim.new(0, 16)
-topCorner.Parent = topGrad
-
--- ── Шапка ──
-local header = Instance.new("Frame")
-header.Name             = "Header"
-header.Size             = UDim2.new(1, 0, 0, 52)
-header.BackgroundTransparency = 1
-header.ZIndex           = 12
-header.Parent           = mainFrame
-
-local title = Instance.new("TextLabel")
-title.Size              = UDim2.new(1, -60, 1, 0)
-title.Position          = UDim2.new(0, 18, 0, 0)
-title.BackgroundTransparency = 1
-title.Font              = Enum.Font.GothamBold
-title.TextSize          = 18
-title.TextColor3        = Color3.fromRGB(220, 225, 255)
-title.TextXAlignment    = Enum.TextXAlignment.Left
-title.Text              = "🐾  Pet Inventory Viewer"
-title.ZIndex            = 12
-title.Parent            = header
-
--- кнопка закрыть
-local closeBtn = Instance.new("TextButton")
-closeBtn.Name           = "CloseBtn"
-closeBtn.Size           = UDim2.new(0, 32, 0, 32)
-closeBtn.AnchorPoint    = Vector2.new(1, 0.5)
-closeBtn.Position       = UDim2.new(1, -14, 0.5, 0)
-closeBtn.BackgroundColor3 = Color3.fromRGB(220, 60, 80)
-closeBtn.Font           = Enum.Font.GothamBold
-closeBtn.TextSize       = 16
-closeBtn.TextColor3     = Color3.white
-closeBtn.Text           = "✕"
-closeBtn.ZIndex         = 13
-closeBtn.Parent         = header
-newCorner(8, closeBtn)
-
--- ── Разделитель ──
-local divider = Instance.new("Frame")
-divider.Size            = UDim2.new(1, -32, 0, 1)
-divider.Position        = UDim2.new(0, 16, 0, 52)
-divider.BackgroundColor3 = Color3.fromRGB(40, 45, 70)
-divider.BorderSizePixel = 0
-divider.ZIndex          = 12
-divider.Parent          = mainFrame
-
--- ── Левая панель (выбор игрока) ──
-local leftPanel = Instance.new("Frame")
-leftPanel.Name          = "LeftPanel"
-leftPanel.Size          = UDim2.new(0, 190, 1, -60)
-leftPanel.Position      = UDim2.new(0, 0, 0, 53)
-leftPanel.BackgroundColor3 = Color3.fromRGB(14, 15, 25)
-leftPanel.BorderSizePixel  = 0
-leftPanel.ZIndex        = 12
-leftPanel.Parent        = mainFrame
-local lpCorner = Instance.new("UICorner")
-lpCorner.CornerRadius   = UDim.new(0, 16)
-lpCorner.Parent         = leftPanel
--- обрежем правые углы
-local lpRight = Instance.new("Frame")
-lpRight.Size            = UDim2.new(0, 16, 1, 0)
-lpRight.Position        = UDim2.new(1, -16, 0, 0)
-lpRight.BackgroundColor3 = Color3.fromRGB(14, 15, 25)
-lpRight.BorderSizePixel = 0
-lpRight.ZIndex          = 11
-lpRight.Parent          = leftPanel
-
-local lpTitle = Instance.new("TextLabel")
-lpTitle.Size            = UDim2.new(1, -16, 0, 30)
-lpTitle.Position        = UDim2.new(0, 10, 0, 8)
-lpTitle.BackgroundTransparency = 1
-lpTitle.Font            = Enum.Font.GothamBold
-lpTitle.TextSize        = 13
-lpTitle.TextColor3      = Color3.fromRGB(120, 130, 180)
-lpTitle.TextXAlignment  = Enum.TextXAlignment.Left
-lpTitle.Text            = "PLAYERS ON SERVER"
-lpTitle.ZIndex          = 13
-lpTitle.Parent          = leftPanel
-
--- скролл для игроков
-local playerScroll = Instance.new("ScrollingFrame")
-playerScroll.Name           = "PlayerScroll"
-playerScroll.Size           = UDim2.new(1, -10, 1, -48)
-playerScroll.Position       = UDim2.new(0, 5, 0, 44)
-playerScroll.BackgroundTransparency = 1
-playerScroll.BorderSizePixel = 0
-playerScroll.ScrollBarThickness = 3
-playerScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 90, 150)
-playerScroll.CanvasSize     = UDim2.new(0, 0, 0, 0)
-playerScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-playerScroll.ZIndex         = 13
-playerScroll.Parent         = leftPanel
-
-local playerList = Instance.new("UIListLayout")
-playerList.Padding         = UDim.new(0, 4)
-playerList.SortOrder       = Enum.SortOrder.LayoutOrder
-playerList.Parent          = playerScroll
-
-local playerPad = Instance.new("UIPadding")
-playerPad.PaddingLeft  = UDim.new(0, 4)
-playerPad.PaddingRight = UDim.new(0, 4)
-playerPad.Parent       = playerScroll
-
--- ── Правая панель (контент) ──
-local rightPanel = Instance.new("Frame")
-rightPanel.Name         = "RightPanel"
-rightPanel.Size         = UDim2.new(1, -198, 1, -60)
-rightPanel.Position     = UDim2.new(0, 196, 0, 53)
-rightPanel.BackgroundTransparency = 1
-rightPanel.ZIndex       = 12
-rightPanel.Parent       = mainFrame
-
--- строка инфо / сортировка
-local topBar = Instance.new("Frame")
-topBar.Size             = UDim2.new(1, 0, 0, 42)
-topBar.BackgroundTransparency = 1
-topBar.ZIndex           = 12
-topBar.Parent           = rightPanel
-
-local infoLabel = Instance.new("TextLabel")
-infoLabel.Name          = "InfoLabel"
-infoLabel.Size          = UDim2.new(0.5, 0, 1, 0)
-infoLabel.BackgroundTransparency = 1
-infoLabel.Font          = Enum.Font.GothamMedium
-infoLabel.TextSize      = 13
-infoLabel.TextColor3    = Color3.fromRGB(150, 160, 210)
-infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-infoLabel.Text          = "← Выбери игрока"
-infoLabel.ZIndex        = 13
-infoLabel.Parent        = topBar
-
--- кнопки сортировки
-local sortModes = {"rarity", "mutation", "name", "count"}
-local sortLabels = {rarity="По редкости", mutation="По мутации", name="По имени", count="По кол-ву"}
-local sortBtns = {}
-local currentSort = "rarity"
-
-local sortRow = Instance.new("Frame")
-sortRow.Size            = UDim2.new(0.5, -4, 1, -10)
-sortRow.Position        = UDim2.new(0.5, 0, 0, 5)
-sortRow.BackgroundTransparency = 1
-sortRow.ZIndex          = 13
-sortRow.Parent          = topBar
-
-local sortLayout = Instance.new("UIListLayout")
-sortLayout.FillDirection = Enum.FillDirection.Horizontal
-sortLayout.Padding       = UDim.new(0, 4)
-sortLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-sortLayout.Parent        = sortRow
-
-for _, mode in ipairs(sortModes) do
-    local btn = Instance.new("TextButton")
-    btn.Name            = mode
-    btn.Size            = UDim2.new(0, 90, 1, 0)
-    btn.BackgroundColor3 = Color3.fromRGB(22, 24, 40)
-    btn.Font            = Enum.Font.GothamSemibold
-    btn.TextSize        = 11
-    btn.TextColor3      = Color3.fromRGB(140, 150, 200)
-    btn.Text            = sortLabels[mode]
-    btn.AutoButtonColor = false
-    btn.ZIndex          = 14
-    btn.Parent          = sortRow
-    newCorner(8, btn)
-    newStroke(1, Color3.fromRGB(50, 55, 90), 0, btn)
-    sortBtns[mode] = btn
+local function makeTweenProps(size, pos)
+	return { Size = size, Position = pos }
 end
 
-local function updateSortBtns()
-    for mode, btn in pairs(sortBtns) do
-        if mode == currentSort then
-            btn.BackgroundColor3 = Color3.fromRGB(60, 80, 180)
-            btn.TextColor3       = Color3.white
-        else
-            btn.BackgroundColor3 = Color3.fromRGB(22, 24, 40)
-            btn.TextColor3       = Color3.fromRGB(140, 150, 200)
-        end
-    end
+-- Удалим старый GUI если уже существует (при повторном запуске)
+local oldGui = LocalPlayer.PlayerGui:FindFirstChild("PetInventoryViewer")
+if oldGui then oldGui:Destroy() end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name             = "PetInventoryViewer"
+ScreenGui.ResetOnSpawn     = false
+ScreenGui.ZIndexBehavior   = Enum.ZIndexBehavior.Sibling
+ScreenGui.IgnoreGuiInset   = true
+ScreenGui.Parent           = LocalPlayer.PlayerGui
+
+-- ── Кнопка-триггер (маленькая кнопка «👁 Инвентарь») ──────────
+local TriggerBtn = Instance.new("TextButton")
+TriggerBtn.Name            = "TriggerBtn"
+TriggerBtn.Size            = UDim2.new(0, 160, 0, 38)
+TriggerBtn.Position        = UDim2.new(0, 10, 0.5, -19)
+TriggerBtn.BackgroundColor3= Color3.fromRGB(20, 20, 30)
+TriggerBtn.BorderSizePixel = 0
+TriggerBtn.Text            = "👁  Pet Viewer"
+TriggerBtn.TextColor3      = Color3.fromRGB(200, 230, 255)
+TriggerBtn.TextSize        = 15
+TriggerBtn.Font            = Enum.Font.GothamBold
+TriggerBtn.ZIndex          = 2
+TriggerBtn.Parent          = ScreenGui
+Instance.new("UICorner", TriggerBtn).CornerRadius = UDim.new(0, 8)
+local TriggerStroke = Instance.new("UIStroke", TriggerBtn)
+TriggerStroke.Color     = Color3.fromRGB(80, 160, 255)
+TriggerStroke.Thickness = 1.5
+
+-- ── Главное окно ──────────────────────────────────────────────
+local MainFrame = Instance.new("Frame")
+MainFrame.Name              = "MainFrame"
+MainFrame.Size              = UDim2.new(0, 680, 0, 520)
+MainFrame.Position          = UDim2.new(0.5, -340, 0.5, -260)
+MainFrame.BackgroundColor3  = Color3.fromRGB(10, 12, 22)
+MainFrame.BorderSizePixel   = 0
+MainFrame.Visible           = false
+MainFrame.ZIndex            = 5
+MainFrame.Parent            = ScreenGui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+local MainStroke = Instance.new("UIStroke", MainFrame)
+MainStroke.Color     = Color3.fromRGB(60, 100, 200)
+MainStroke.Thickness = 2
+
+-- Тень (тёмный Frame позади)
+local Shadow = Instance.new("Frame")
+Shadow.Size              = UDim2.new(1, 20, 1, 20)
+Shadow.Position          = UDim2.new(0, -10, 0, 10)
+Shadow.BackgroundColor3  = Color3.fromRGB(0, 0, 0)
+Shadow.BackgroundTransparency = 0.55
+Shadow.BorderSizePixel   = 0
+Shadow.ZIndex            = 4
+Shadow.Parent            = MainFrame
+Instance.new("UICorner", Shadow).CornerRadius = UDim.new(0, 14)
+
+-- Заголовок
+local TitleBar = Instance.new("Frame")
+TitleBar.Size             = UDim2.new(1, 0, 0, 44)
+TitleBar.BackgroundColor3 = Color3.fromRGB(14, 18, 35)
+TitleBar.BorderSizePixel  = 0
+TitleBar.ZIndex           = 6
+TitleBar.Parent           = MainFrame
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 12)
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size             = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position         = UDim2.new(0, 14, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text             = "🐾  Pet Inventory Viewer"
+TitleLabel.TextColor3       = Color3.fromRGB(180, 210, 255)
+TitleLabel.TextSize         = 17
+TitleLabel.Font             = Enum.Font.GothamBold
+TitleLabel.TextXAlignment   = Enum.TextXAlignment.Left
+TitleLabel.ZIndex           = 7
+TitleLabel.Parent           = TitleBar
+
+-- Кнопка закрыть
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size             = UDim2.new(0, 32, 0, 32)
+CloseBtn.Position         = UDim2.new(1, -40, 0, 6)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 60)
+CloseBtn.Text             = "✕"
+CloseBtn.TextColor3       = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize         = 16
+CloseBtn.Font             = Enum.Font.GothamBold
+CloseBtn.ZIndex           = 8
+CloseBtn.Parent           = TitleBar
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+-- ── Левая панель: список игроков ─────────────────────────────
+local LeftPanel = Instance.new("Frame")
+LeftPanel.Size              = UDim2.new(0, 170, 1, -50)
+LeftPanel.Position          = UDim2.new(0, 8, 0, 50)
+LeftPanel.BackgroundColor3  = Color3.fromRGB(14, 18, 35)
+LeftPanel.BorderSizePixel   = 0
+LeftPanel.ZIndex            = 6
+LeftPanel.Parent            = MainFrame
+Instance.new("UICorner", LeftPanel).CornerRadius = UDim.new(0, 8)
+
+local PlayersLabel = Instance.new("TextLabel")
+PlayersLabel.Size           = UDim2.new(1, 0, 0, 28)
+PlayersLabel.BackgroundTransparency = 1
+PlayersLabel.Text           = "  Игроки на сервере"
+PlayersLabel.TextColor3     = Color3.fromRGB(120, 160, 220)
+PlayersLabel.TextSize       = 12
+PlayersLabel.Font           = Enum.Font.GothamBold
+PlayersLabel.TextXAlignment = Enum.TextXAlignment.Left
+PlayersLabel.ZIndex         = 7
+PlayersLabel.Parent         = LeftPanel
+
+local PlayerScroll = Instance.new("ScrollingFrame")
+PlayerScroll.Size              = UDim2.new(1, -4, 1, -34)
+PlayerScroll.Position          = UDim2.new(0, 2, 0, 30)
+PlayerScroll.BackgroundTransparency = 1
+PlayerScroll.BorderSizePixel   = 0
+PlayerScroll.ScrollBarThickness= 3
+PlayerScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 130, 220)
+PlayerScroll.CanvasSize        = UDim2.new(0, 0, 0, 0)
+PlayerScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+PlayerScroll.ZIndex            = 7
+PlayerScroll.Parent            = LeftPanel
+Instance.new("UIListLayout", PlayerScroll).Padding = UDim.new(0, 3)
+
+-- ── Правая панель: карточки петов ───────────────────────────
+local RightPanel = Instance.new("Frame")
+RightPanel.Size             = UDim2.new(1, -186, 1, -96)
+RightPanel.Position         = UDim2.new(0, 182, 0, 50)
+RightPanel.BackgroundTransparency = 1
+RightPanel.ZIndex           = 6
+RightPanel.Parent           = MainFrame
+
+-- Панель сортировки
+local SortBar = Instance.new("Frame")
+SortBar.Size              = UDim2.new(1, 0, 0, 34)
+SortBar.BackgroundColor3  = Color3.fromRGB(14, 18, 35)
+SortBar.BorderSizePixel   = 0
+SortBar.ZIndex            = 7
+SortBar.Parent            = RightPanel
+Instance.new("UICorner", SortBar).CornerRadius = UDim.new(0, 8)
+
+local SortLayout = Instance.new("UIListLayout", SortBar)
+SortLayout.FillDirection  = Enum.FillDirection.Horizontal
+SortLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+SortLayout.Padding        = UDim.new(0, 4)
+Instance.new("UIPadding", SortBar).PaddingLeft = UDim.new(0, 6)
+
+local sortLabel = Instance.new("TextLabel")
+sortLabel.Size             = UDim2.new(0, 68, 1, 0)
+sortLabel.BackgroundTransparency = 1
+sortLabel.Text             = "Сортировка:"
+sortLabel.TextColor3       = Color3.fromRGB(140, 160, 200)
+sortLabel.TextSize         = 12
+sortLabel.Font             = Enum.Font.Gotham
+sortLabel.ZIndex           = 8
+sortLabel.Parent           = SortBar
+
+local SORT_MODES = {"Редкость","Мутация","Название","Количество"}
+local sortButtons  = {}
+local currentSort  = "Редкость"
+
+local function makeSortBtn(label)
+	local btn = Instance.new("TextButton")
+	btn.Size              = UDim2.new(0, 78, 0, 24)
+	btn.BackgroundColor3  = Color3.fromRGB(25, 30, 52)
+	btn.Text              = label
+	btn.TextColor3        = Color3.fromRGB(160, 190, 240)
+	btn.TextSize          = 12
+	btn.Font              = Enum.Font.GothamBold
+	btn.ZIndex            = 8
+	btn.Parent            = SortBar
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+	return btn
 end
-updateSortBtns()
 
--- второй разделитель
-local div2 = Instance.new("Frame")
-div2.Size               = UDim2.new(1, 0, 0, 1)
-div2.Position           = UDim2.new(0, 0, 0, 42)
-div2.BackgroundColor3   = Color3.fromRGB(30, 33, 55)
-div2.BorderSizePixel    = 0
-div2.ZIndex             = 12
-div2.Parent             = rightPanel
+for _, mode in ipairs(SORT_MODES) do
+	sortButtons[mode] = makeSortBtn(mode)
+end
 
--- скролл карточек
-local cardScroll = Instance.new("ScrollingFrame")
-cardScroll.Name             = "CardScroll"
-cardScroll.Size             = UDim2.new(1, -8, 1, -52)
-cardScroll.Position         = UDim2.new(0, 0, 0, 52)
-cardScroll.BackgroundTransparency = 1
-cardScroll.BorderSizePixel  = 0
-cardScroll.ScrollBarThickness = 4
-cardScroll.ScrollBarImageColor3 = Color3.fromRGB(70, 80, 140)
-cardScroll.CanvasSize        = UDim2.new(0, 0, 0, 0)
-cardScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-cardScroll.ZIndex            = 12
-cardScroll.Parent            = rightPanel
+-- Статус / кол-во петов
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size             = UDim2.new(1, 0, 0, 22)
+StatusLabel.Position         = UDim2.new(0, 0, 0, 38)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Text             = "Выберите игрока слева"
+StatusLabel.TextColor3       = Color3.fromRGB(120, 140, 180)
+StatusLabel.TextSize         = 12
+StatusLabel.Font             = Enum.Font.Gotham
+StatusLabel.TextXAlignment   = Enum.TextXAlignment.Left
+StatusLabel.ZIndex           = 7
+StatusLabel.Parent           = RightPanel
 
-local gridLayout = Instance.new("UIGridLayout")
-gridLayout.CellSize          = UDim2.new(0, 140, 0, 185)
-gridLayout.CellPadding       = UDim2.new(0, 10, 0, 10)
-gridLayout.SortOrder         = Enum.SortOrder.LayoutOrder
-gridLayout.Parent            = cardScroll
+-- Скролл для карточек
+local CardScroll = Instance.new("ScrollingFrame")
+CardScroll.Size              = UDim2.new(1, 0, 1, -64)
+CardScroll.Position          = UDim2.new(0, 0, 0, 62)
+CardScroll.BackgroundTransparency = 1
+CardScroll.BorderSizePixel   = 0
+CardScroll.ScrollBarThickness= 4
+CardScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 130, 220)
+CardScroll.CanvasSize        = UDim2.new(0, 0, 0, 0)
+CardScroll.ZIndex            = 7
+CardScroll.Parent            = RightPanel
 
-local gridPad = Instance.new("UIPadding")
-gridPad.PaddingTop    = UDim.new(0, 8)
-gridPad.PaddingLeft   = UDim.new(0, 6)
-gridPad.PaddingBottom = UDim.new(0, 8)
-gridPad.Parent        = cardScroll
+local CardGrid = Instance.new("UIGridLayout", CardScroll)
+CardGrid.CellSize     = UDim2.new(0, 142, 0, 190)
+CardGrid.CellPadding  = UDim2.new(0, 8, 0, 8)
+CardGrid.SortOrder    = Enum.SortOrder.LayoutOrder
+Instance.new("UIPadding", CardScroll).PaddingTop = UDim.new(0, 4)
 
--- placeholder
-local placeholder = Instance.new("TextLabel")
-placeholder.Name            = "Placeholder"
-placeholder.Size            = UDim2.new(1, 0, 1, 0)
-placeholder.BackgroundTransparency = 1
-placeholder.Font            = Enum.Font.GothamMedium
-placeholder.TextSize        = 15
-placeholder.TextColor3      = Color3.fromRGB(80, 90, 130)
-placeholder.Text            = "Выбери игрока слева,\nчтобы увидеть его петов"
-placeholder.TextWrapped     = true
-placeholder.ZIndex          = 13
-placeholder.Parent          = cardScroll
+-- ── Кнопка «Загрузить инвентарь» ─────────────────────────────
+local LoadBtn = Instance.new("TextButton")
+LoadBtn.Size              = UDim2.new(1, -16, 0, 34)
+LoadBtn.Position          = UDim2.new(0, 8, 1, -42)
+LoadBtn.BackgroundColor3  = Color3.fromRGB(30, 80, 200)
+LoadBtn.Text              = "🔍  Загрузить инвентарь"
+LoadBtn.TextColor3        = Color3.fromRGB(220, 235, 255)
+LoadBtn.TextSize          = 14
+LoadBtn.Font              = Enum.Font.GothamBold
+LoadBtn.ZIndex            = 6
+LoadBtn.Parent            = MainFrame
+Instance.new("UICorner", LoadBtn).CornerRadius = UDim.new(0, 8)
 
 -- ─────────────────────────────────────────────────────────────
---  СОЗДАНИЕ КАРТОЧКИ ПЕТА
+--  СОСТОЯНИЕ
 -- ─────────────────────────────────────────────────────────────
-local function createPetCard(petData, order)
-    local rarityColor   = getRarityColor(petData.rarity)
-    local mutColor      = getMutationColor(petData.mutation)
+local selectedPlayer = nil  -- объект Player
+local cachedPets     = {}   -- таблица данных петов текущего игрока
 
-    local card = Instance.new("Frame")
-    card.Name               = petData.name .. "_card"
-    card.Size               = UDim2.new(0, 140, 0, 185)
-    card.BackgroundColor3   = Color3.fromRGB(16, 17, 28)
-    card.BorderSizePixel    = 0
-    card.LayoutOrder        = order
-    card.ZIndex             = 14
-    card.Parent             = cardScroll
-    newCorner(12, card)
-    local cardStroke = newStroke(1.5, rarityColor, 0.3, card)
+-- ─────────────────────────────────────────────────────────────
+--  ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+-- ─────────────────────────────────────────────────────────────
 
-    -- Тонкая полоса сверху цвета редкости
-    local rarBar = Instance.new("Frame")
-    rarBar.Size             = UDim2.new(1, 0, 0, 3)
-    rarBar.BackgroundColor3 = rarityColor
-    rarBar.BorderSizePixel  = 0
-    rarBar.ZIndex           = 15
-    rarBar.Parent           = card
-    newCorner(12, rarBar)
+-- Получить все данные петов из Backpack игрока
+local function getPetsFromBackpack(player)
+	local backpack = player:FindFirstChild("Backpack")
+	if not backpack then return {} end
 
-    -- Изображение пета
-    local imgFrame = Instance.new("Frame")
-    imgFrame.Size           = UDim2.new(1, -16, 0, 88)
-    imgFrame.Position       = UDim2.new(0, 8, 0, 10)
-    imgFrame.BackgroundColor3 = Color3.fromRGB(10, 11, 20)
-    imgFrame.BorderSizePixel = 0
-    imgFrame.ZIndex         = 15
-    imgFrame.Parent         = card
-    newCorner(8, imgFrame)
+	local pets = {}
+	local countMap = {} -- name+mutation -> count
 
-    local imgLabel = Instance.new("ImageLabel")
-    imgLabel.Size           = UDim2.new(1, -8, 1, -8)
-    imgLabel.Position       = UDim2.new(0, 4, 0, 4)
-    imgLabel.BackgroundTransparency = 1
-    imgLabel.ScaleType      = Enum.ScaleType.Fit
-    imgLabel.ZIndex         = 16
-    imgLabel.Image          = petData.image ~= "" and petData.image or "rbxasset://textures/ui/GuiImagePlaceholder.png"
-    imgLabel.Parent         = imgFrame
+	for _, tool in ipairs(backpack:GetChildren()) do
+		if tool:IsA("Tool") and not IGNORED_TOOLS[tool.Name] then
+			local infoGUI  = tool:FindFirstChild("InfoGUI")
+			if infoGUI then
+				-- Читаем текстовые метки
+				local function getText(labelName)
+					local lbl = infoGUI:FindFirstChild(labelName)
+					if lbl and lbl:IsA("TextLabel") then
+						-- Значение может быть после двоеточия: "Rarity: Legendary"
+						local v = lbl.Text
+						local after = v:match(":%s*(.+)$")
+						return after and after:match("^%s*(.-)%s*$") or v:match("^%s*(.-)%s*$")
+					end
+					return "?"
+				end
 
-    -- Значок количества (если > 1)
-    if petData.count > 1 then
-        local countBadge = Instance.new("TextLabel")
-        countBadge.Size         = UDim2.new(0, 28, 0, 20)
-        countBadge.Position     = UDim2.new(1, -32, 0, 4)
-        countBadge.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-        countBadge.Font         = Enum.Font.GothamBold
-        countBadge.TextSize     = 11
-        countBadge.TextColor3   = Color3.fromRGB(220, 230, 255)
-        countBadge.Text         = "×" .. petData.count
-        countBadge.ZIndex       = 17
-        countBadge.Parent       = card
-        newCorner(6, countBadge)
-        newStroke(1, Color3.fromRGB(60, 70, 120), 0, countBadge)
-    end
+				local petName    = getText("Name")
+				local rarity     = getText("Rarity")
+				local mutation   = getText("Mutation")
+				local earnings   = getText("Earnings")
 
-    -- Имя
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size          = UDim2.new(1, -10, 0, 22)
-    nameLabel.Position      = UDim2.new(0, 5, 0, 102)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Font          = Enum.Font.GothamBold
-    nameLabel.TextSize      = 12
-    nameLabel.TextColor3    = Color3.fromRGB(230, 235, 255)
-    nameLabel.TextTruncate  = Enum.TextTruncate.AtEnd
-    nameLabel.Text          = petData.name
-    nameLabel.ZIndex        = 15
-    nameLabel.Parent        = card
+				-- Картинка через ImageLabel внутри Open This
+				local imageId = ""
+				local openThis = tool:FindFirstChild("Open This")
+				if openThis then
+					local imgObj = openThis:FindFirstChild("Paste the link to the image in here")
+					if imgObj and imgObj:IsA("ImageLabel") then
+						imageId = imgObj.Image
+					end
+				end
 
-    -- Чип редкости
-    local rarChip = Instance.new("TextLabel")
-    rarChip.Size            = UDim2.new(1, -10, 0, 18)
-    rarChip.Position        = UDim2.new(0, 5, 0, 124)
-    rarChip.BackgroundColor3 = labelColor(rarityColor)
-    rarChip.Font            = Enum.Font.GothamSemibold
-    rarChip.TextSize        = 10
-    rarChip.TextColor3      = rarityColor
-    rarChip.Text            = "✦ " .. petData.rarity
-    rarChip.ZIndex          = 15
-    rarChip.Parent          = card
-    newCorner(5, rarChip)
+				local key = petName .. "|" .. mutation
+				countMap[key] = (countMap[key] or 0) + 1
 
-    -- Чип мутации
-    local mutChip = Instance.new("TextLabel")
-    mutChip.Size            = UDim2.new(1, -10, 0, 18)
-    mutChip.Position        = UDim2.new(0, 5, 0, 144)
-    mutChip.BackgroundColor3 = labelColor(mutColor)
-    mutChip.Font            = Enum.Font.GothamSemibold
-    mutChip.TextSize        = 10
-    mutChip.TextColor3      = mutColor
-    mutChip.Text            = "◈ " .. petData.mutation
-    mutChip.ZIndex          = 15
-    mutChip.Parent          = card
-    newCorner(5, mutChip)
+				table.insert(pets, {
+					name     = petName,
+					rarity   = rarity,
+					mutation = mutation,
+					earnings = earnings,
+					image    = imageId,
+					key      = key,
+				})
+			end
+		end
+	end
 
-    -- Заработок
-    local earnLabel = Instance.new("TextLabel")
-    earnLabel.Size          = UDim2.new(1, -10, 0, 16)
-    earnLabel.Position      = UDim2.new(0, 5, 0, 164)
-    earnLabel.BackgroundTransparency = 1
-    earnLabel.Font          = Enum.Font.Gotham
-    earnLabel.TextSize      = 10
-    earnLabel.TextColor3    = Color3.fromRGB(100, 230, 120)
-    earnLabel.Text          = "💰 " .. (petData.earnings ~= "" and petData.earnings or "—") .. "/s"
-    earnLabel.ZIndex        = 15
-    earnLabel.Parent        = card
+	-- Добавим count в каждую запись
+	for _, pet in ipairs(pets) do
+		pet.count = countMap[pet.key]
+	end
 
-    return card
+	return pets
+end
+
+-- Сортировка
+local function sortPets(pets, mode)
+	local sorted = {}
+	for _, p in ipairs(pets) do table.insert(sorted, p) end
+
+	if mode == "Редкость" then
+		table.sort(sorted, function(a, b)
+			local ra = RARITY_ORDER[a.rarity]   or 99
+			local rb = RARITY_ORDER[b.rarity]   or 99
+			if ra ~= rb then return ra < rb end
+			local ma = MUTATION_ORDER[a.mutation] or 99
+			local mb = MUTATION_ORDER[b.mutation] or 99
+			return ma < mb
+		end)
+	elseif mode == "Мутация" then
+		table.sort(sorted, function(a, b)
+			local ma = MUTATION_ORDER[a.mutation] or 99
+			local mb = MUTATION_ORDER[b.mutation] or 99
+			if ma ~= mb then return ma < mb end
+			local ra = RARITY_ORDER[a.rarity]   or 99
+			local rb = RARITY_ORDER[b.rarity]   or 99
+			return ra < rb
+		end)
+	elseif mode == "Название" then
+		table.sort(sorted, function(a, b)
+			return a.name:lower() < b.name:lower()
+		end)
+	elseif mode == "Количество" then
+		table.sort(sorted, function(a, b)
+			if a.count ~= b.count then return a.count > b.count end
+			local ra = RARITY_ORDER[a.rarity] or 99
+			local rb = RARITY_ORDER[b.rarity] or 99
+			return ra < rb
+		end)
+	end
+	return sorted
+end
+
+-- Создать карточку пета
+local function makeCard(pet, order)
+	local rarityColor   = RARITY_COLORS[pet.rarity]   or Color3.fromRGB(180,180,180)
+	local mutationColor = MUTATION_COLORS[pet.mutation] or Color3.fromRGB(200,200,200)
+
+	local card = Instance.new("Frame")
+	card.Size              = UDim2.new(0, 142, 0, 190)
+	card.BackgroundColor3  = Color3.fromRGB(16, 20, 38)
+	card.BorderSizePixel   = 0
+	card.LayoutOrder       = order
+	card.ZIndex            = 8
+	Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+
+	-- Цветная полоска редкости сверху
+	local topBar = Instance.new("Frame", card)
+	topBar.Size             = UDim2.new(1, 0, 0, 4)
+	topBar.BackgroundColor3 = rarityColor
+	topBar.BorderSizePixel  = 0
+	topBar.ZIndex           = 9
+	Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 10)
+
+	-- Обводка карточки цветом редкости
+	local stroke = Instance.new("UIStroke", card)
+	stroke.Color     = rarityColor
+	stroke.Thickness = 1.2
+	stroke.Transparency = 0.45
+
+	-- Картинка пета
+	local img = Instance.new("ImageLabel", card)
+	img.Size              = UDim2.new(0, 100, 0, 88)
+	img.Position          = UDim2.new(0.5, -50, 0, 10)
+	img.BackgroundColor3  = Color3.fromRGB(10, 13, 25)
+	img.BorderSizePixel   = 0
+	img.Image             = pet.image ~= "" and pet.image or "rbxasset://textures/ui/GuiImagePlaceholder.png"
+	img.ScaleType         = Enum.ScaleType.Fit
+	img.ZIndex            = 9
+	Instance.new("UICorner", img).CornerRadius = UDim.new(0, 8)
+
+	-- Если количество > 1 — значок x2 etc.
+	if pet.count and pet.count > 1 then
+		local badge = Instance.new("TextLabel", card)
+		badge.Size             = UDim2.new(0, 34, 0, 18)
+		badge.Position         = UDim2.new(1, -38, 0, 14)
+		badge.BackgroundColor3 = Color3.fromRGB(255, 160, 0)
+		badge.Text             = "×" .. pet.count
+		badge.TextColor3       = Color3.fromRGB(20, 20, 20)
+		badge.TextSize         = 12
+		badge.Font             = Enum.Font.GothamBold
+		badge.ZIndex           = 11
+		Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 5)
+	end
+
+	-- Название
+	local nameLabel = Instance.new("TextLabel", card)
+	nameLabel.Size             = UDim2.new(1, -8, 0, 20)
+	nameLabel.Position         = UDim2.new(0, 4, 0, 102)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text             = pet.name
+	nameLabel.TextColor3       = Color3.fromRGB(225, 235, 255)
+	nameLabel.TextSize         = 12
+	nameLabel.Font             = Enum.Font.GothamBold
+	nameLabel.TextTruncate     = Enum.TextTruncate.AtEnd
+	nameLabel.ZIndex           = 9
+
+	-- Редкость
+	local rarLabel = Instance.new("TextLabel", card)
+	rarLabel.Size              = UDim2.new(1, -8, 0, 16)
+	rarLabel.Position          = UDim2.new(0, 4, 0, 122)
+	rarLabel.BackgroundTransparency = 1
+	rarLabel.Text              = "✦ " .. (pet.rarity or "?")
+	rarLabel.TextColor3        = rarityColor
+	rarLabel.TextSize          = 11
+	rarLabel.Font              = Enum.Font.GothamBold
+	rarLabel.ZIndex            = 9
+
+	-- Мутация
+	local mutLabel = Instance.new("TextLabel", card)
+	mutLabel.Size              = UDim2.new(1, -8, 0, 16)
+	mutLabel.Position          = UDim2.new(0, 4, 0, 139)
+	mutLabel.BackgroundTransparency = 1
+	mutLabel.Text              = "◈ " .. (pet.mutation or "?")
+	mutLabel.TextColor3        = mutationColor
+	mutLabel.TextSize          = 11
+	mutLabel.Font              = Enum.Font.Gotham
+	mutLabel.ZIndex            = 9
+
+	-- Заработок
+	local earnLabel = Instance.new("TextLabel", card)
+	earnLabel.Size             = UDim2.new(1, -8, 0, 16)
+	earnLabel.Position         = UDim2.new(0, 4, 0, 157)
+	earnLabel.BackgroundTransparency = 1
+	earnLabel.Text             = "💰 " .. (pet.earnings or "?") .. "/сек"
+	earnLabel.TextColor3       = Color3.fromRGB(255, 220, 100)
+	earnLabel.TextSize         = 11
+	earnLabel.Font             = Enum.Font.Gotham
+	earnLabel.ZIndex           = 9
+
+	return card
 end
 
 -- ─────────────────────────────────────────────────────────────
---  ОТОБРАЖЕНИЕ ИНВЕНТАРЯ
+--  ОБНОВЛЕНИЕ КАРТОЧЕК
 -- ─────────────────────────────────────────────────────────────
-local currentPets = {}
+local function renderCards(pets)
+	-- Удалить старые карточки
+	for _, child in ipairs(CardScroll:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
 
-local function clearCards()
-    for _, child in ipairs(cardScroll:GetChildren()) do
-        if child:IsA("Frame") and child.Name ~= "Placeholder" then
-            child:Destroy()
-        end
-    end
-end
+	if #pets == 0 then
+		StatusLabel.Text = "⚠  Петов не найдено в инвентаре"
+		return
+	end
 
-local function displayPets()
-    clearCards()
-    local sorted = sortPets(currentPets, currentSort)
-    if #sorted == 0 then
-        placeholder.Text    = "У игрока нет петов\n(или они не загружены)"
-        placeholder.Visible = true
-        return
-    end
-    placeholder.Visible = false
-    for i, pet in ipairs(sorted) do
-        createPetCard(pet, i)
-    end
-end
+	-- Дедупликация для отображения: показываем одну карточку на key,
+	-- но с полем count (уже проставлено при парсинге)
+	local seen    = {}
+	local unique  = {}
+	for _, pet in ipairs(pets) do
+		if not seen[pet.key] then
+			seen[pet.key] = true
+			table.insert(unique, pet)
+		end
+	end
 
-local function loadPlayer(player)
-    infoLabel.Text = "⏳  Загружаю " .. player.Name .. "..."
-    clearCards()
-    placeholder.Visible = true
-    placeholder.Text    = "⏳  Читаю бекпак..."
+	StatusLabel.Text = string.format("🐾  Всего петов: %d  |  Уникальных: %d  |  Сортировка: %s",
+		#pets, #unique, currentSort)
 
-    task.spawn(function()
-        local pets = readPets(player)
-        currentPets = pets
-        infoLabel.Text = "🐾 " .. player.Name .. "  —  " .. #pets .. " уникальных петов"
-        displayPets()
-    end)
+	for i, pet in ipairs(unique) do
+		local card = makeCard(pet, i)
+		card.Parent = CardScroll
+	end
+
+	-- Обновить высоту скролла
+	local cols = math.floor(CardScroll.AbsoluteSize.X / (142 + 8))
+	if cols < 1 then cols = 1 end
+	local rows = math.ceil(#unique / cols)
+	CardScroll.CanvasSize = UDim2.new(0, 0, 0, rows * (190 + 8) + 8)
 end
 
 -- ─────────────────────────────────────────────────────────────
 --  СПИСОК ИГРОКОВ
 -- ─────────────────────────────────────────────────────────────
-local selectedPlayerBtn = nil
-
-local function updatePlayerColor(btn, selected)
-    if selected then
-        btn.BackgroundColor3 = Color3.fromRGB(45, 55, 120)
-        btn.TextColor3       = Color3.white
-    else
-        btn.BackgroundColor3 = Color3.fromRGB(20, 22, 38)
-        btn.TextColor3       = Color3.fromRGB(170, 180, 220)
-    end
+local function updateSortButtons()
+	for mode, btn in pairs(sortButtons) do
+		if mode == currentSort then
+			btn.BackgroundColor3 = Color3.fromRGB(30, 80, 200)
+			btn.TextColor3       = Color3.fromRGB(255, 255, 255)
+		else
+			btn.BackgroundColor3 = Color3.fromRGB(25, 30, 52)
+			btn.TextColor3       = Color3.fromRGB(160, 190, 240)
+		end
+	end
 end
 
-local function buildPlayerButton(player)
-    local btn = Instance.new("TextButton")
-    btn.Name            = player.Name
-    btn.Size            = UDim2.new(1, 0, 0, 34)
-    btn.BackgroundColor3 = Color3.fromRGB(20, 22, 38)
-    btn.Font            = Enum.Font.GothamMedium
-    btn.TextSize        = 13
-    btn.TextColor3      = Color3.fromRGB(170, 180, 220)
-    btn.Text            = "  " .. player.Name
-    btn.TextXAlignment  = Enum.TextXAlignment.Left
-    btn.AutoButtonColor = false
-    btn.ZIndex          = 14
-    btn.Parent          = playerScroll
-    newCorner(8, btn)
+local playerBtns = {}
 
-    btn.MouseButton1Click:Connect(function()
-        if selectedPlayerBtn then
-            updatePlayerColor(selectedPlayerBtn, false)
-        end
-        selectedPlayerBtn = btn
-        updatePlayerColor(btn, true)
-        loadPlayer(player)
-    end)
-
-    btn.MouseEnter:Connect(function()
-        if btn ~= selectedPlayerBtn then
-            tween(btn, {BackgroundColor3 = Color3.fromRGB(30, 34, 60)}, 0.15)
-        end
-    end)
-    btn.MouseLeave:Connect(function()
-        if btn ~= selectedPlayerBtn then
-            tween(btn, {BackgroundColor3 = Color3.fromRGB(20, 22, 38)}, 0.15)
-        end
-    end)
-
-    return btn
+local function clearPlayerList()
+	for _, btn in pairs(playerBtns) do btn:Destroy() end
+	playerBtns = {}
 end
 
-local function refreshPlayerList()
-    selectedPlayerBtn = nil -- Сбрасываем ссылку перед удалением кнопок
-    for _, child in ipairs(playerScroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            buildPlayerButton(player)
-        end
-    end
+local function buildPlayerList()
+	clearPlayerList()
+	for _, player in ipairs(Players:GetPlayers()) do
+		local isLocal = (player == LocalPlayer)
+		local btn = Instance.new("TextButton")
+		btn.Size              = UDim2.new(1, -6, 0, 30)
+		btn.BackgroundColor3  = isLocal
+			and Color3.fromRGB(20, 40, 80)
+			or  Color3.fromRGB(20, 24, 44)
+		btn.Text              = (isLocal and "★ " or "  ") .. player.Name
+		btn.TextColor3        = isLocal
+			and Color3.fromRGB(160, 200, 255)
+			or  Color3.fromRGB(200, 210, 230)
+		btn.TextSize          = 13
+		btn.Font              = Enum.Font.Gotham
+		btn.TextXAlignment    = Enum.TextXAlignment.Left
+		btn.ZIndex            = 8
+		btn.Parent            = PlayerScroll
+		Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+		Instance.new("UIPadding", btn).PaddingLeft = UDim.new(0, 8)
+
+		playerBtns[player.Name] = btn
+
+		btn.MouseButton1Click:Connect(function()
+			selectedPlayer = player
+			-- Сбросить выделение
+			for _, b in pairs(playerBtns) do
+				b.BackgroundColor3 = Color3.fromRGB(20, 24, 44)
+				b.TextColor3       = Color3.fromRGB(200, 210, 230)
+			end
+			btn.BackgroundColor3 = Color3.fromRGB(30, 70, 180)
+			btn.TextColor3       = Color3.fromRGB(255, 255, 255)
+			StatusLabel.Text     = "Выбран: " .. player.Name .. " — нажмите «Загрузить»"
+		end)
+	end
 end
 
 -- ─────────────────────────────────────────────────────────────
---  СОРТИРОВКА — события
+--  ЛОГИКА КНОПОК
 -- ─────────────────────────────────────────────────────────────
-for _, mode in ipairs(sortModes) do
-    sortBtns[mode].MouseButton1Click:Connect(function()
-        currentSort = mode
-        updateSortBtns()
-        if #currentPets > 0 then displayPets() end
-    end)
-end
 
--- ─────────────────────────────────────────────────────────────
---  КНОПКА ЗАКРЫТЬ
--- ─────────────────────────────────────────────────────────────
-local isOpen = false
-
-local function openGUI()
-    isOpen = true
-    overlay.Visible = true
-    mainFrame.Visible = true
-    
-    -- Сбрасываем размер в 0 для эффекта появления
-    mainFrame.Size = UDim2.new(0, 0, 0, 0)
-    overlay.BackgroundTransparency = 1
-    
-    tween(overlay, {BackgroundTransparency = 0.55}, 0.25)
-    tween(mainFrame, {Size = UDim2.new(0, 820, 0, 560)}, 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    
-    refreshPlayerList()
-end
-
-local function closeGUI()
-    isOpen = false
-    tween(overlay, {BackgroundTransparency = 1}, 0.2)
-    tween(mainFrame, {Size = UDim2.new(0, 0, 0, 0)}, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-    
-    task.wait(0.22)
-    if not isOpen then -- Проверка, чтобы не сломать, если резко открыли назад
-        overlay.Visible   = false
-        mainFrame.Visible = false
-        currentPets       = {}
-        selectedPlayerBtn = nil
-    end
-end
-
-closeBtn.MouseButton1Click:Connect(closeGUI)
-overlay.MouseButton1Click:Connect(closeGUI)  -- клик вне окна закрывает
-
--- ─────────────────────────────────────────────────────────────
---  КНОПКА ОТКРЫТИЯ (в углу экрана)
--- ─────────────────────────────────────────────────────────────
-local openBtn = Instance.new("TextButton")
-openBtn.Name            = "OpenPetViewer"
-openBtn.Size            = UDim2.new(0, 160, 0, 38)
-openBtn.Position        = UDim2.new(1, -170, 0, 60)
-openBtn.BackgroundColor3 = Color3.fromRGB(30, 35, 75)
-openBtn.Font            = Enum.Font.GothamBold
-openBtn.TextSize        = 13
-openBtn.TextColor3      = Color3.fromRGB(200, 210, 255)
-openBtn.Text            = "🐾  Pet Viewer"
-openBtn.AutoButtonColor = false
-openBtn.ZIndex          = 5
-openBtn.Parent          = screenGui
-newCorner(10, openBtn)
-newStroke(1.5, Color3.fromRGB(70, 90, 200), 0.2, openBtn)
-
-openBtn.MouseEnter:Connect(function()
-    tween(openBtn, {BackgroundColor3 = Color3.fromRGB(50, 65, 130)}, 0.15)
-end)
-openBtn.MouseLeave:Connect(function()
-    tween(openBtn, {BackgroundColor3 = Color3.fromRGB(30, 35, 75)}, 0.15)
-end)
-openBtn.MouseButton1Click:Connect(function()
-    if isOpen then closeGUI() else openGUI() end
+-- Открыть/закрыть главное окно
+TriggerBtn.MouseButton1Click:Connect(function()
+	MainFrame.Visible = not MainFrame.Visible
+	if MainFrame.Visible then
+		buildPlayerList()
+	end
 end)
 
+CloseBtn.MouseButton1Click:Connect(function()
+	MainFrame.Visible = false
+end)
+
+-- Загрузить инвентарь
+LoadBtn.MouseButton1Click:Connect(function()
+	if not selectedPlayer then
+		StatusLabel.Text = "⚠  Сначала выберите игрока!"
+		return
+	end
+	if not Players:FindFirstChild(selectedPlayer.Name) then
+		StatusLabel.Text = "⚠  Игрок покинул сервер"
+		selectedPlayer = nil
+		return
+	end
+
+	StatusLabel.Text = "⏳  Загружаю инвентарь " .. selectedPlayer.Name .. "..."
+
+	-- Очищаем карточки
+	for _, child in ipairs(CardScroll:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
+
+	local pets = getPetsFromBackpack(selectedPlayer)
+	cachedPets = pets
+
+	local sorted = sortPets(pets, currentSort)
+	renderCards(sorted)
+end)
+
+-- Кнопки сортировки
+for mode, btn in pairs(sortButtons) do
+	btn.MouseButton1Click:Connect(function()
+		currentSort = mode
+		updateSortButtons()
+		if #cachedPets > 0 then
+			local sorted = sortPets(cachedPets, currentSort)
+			renderCards(sorted)
+		end
+	end)
+end
+
 -- ─────────────────────────────────────────────────────────────
---  АВТООБНОВЛЕНИЕ СПИСКА ИГРОКОВ
+--  АВТО-ОБНОВЛЕНИЕ СПИСКА ИГРОКОВ
 -- ─────────────────────────────────────────────────────────────
 Players.PlayerAdded:Connect(function()
-    if isOpen then refreshPlayerList() end
+	if MainFrame.Visible then buildPlayerList() end
 end)
 Players.PlayerRemoving:Connect(function(player)
-    if isOpen then
-        local btn = playerScroll:FindFirstChild(player.Name)
-        if btn then btn:Destroy() end
-    end
+	if selectedPlayer == player then
+		selectedPlayer = nil
+		StatusLabel.Text = "⚠  Выбранный игрок покинул сервер"
+	end
+	if MainFrame.Visible then buildPlayerList() end
 end)
 
-print("[PetInventoryViewer] ✅ Загружен. Нажми кнопку 'Pet Viewer' в правом углу.")
+-- ─────────────────────────────────────────────────────────────
+--  ИНИЦИАЛИЗАЦИЯ
+-- ─────────────────────────────────────────────────────────────
+updateSortButtons()
