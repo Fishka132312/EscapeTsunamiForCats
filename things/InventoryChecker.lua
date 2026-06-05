@@ -1,4 +1,4 @@
--- ╔══════════════════════════════════════════════════════════╗ ццц
+-- ╔══════════════════════════════════════════════════════════╗ qqq
 -- ║          PET INVENTORY VIEWER  —  LocalScript            ║
 -- ║  Вставь в StarterPlayerScripts или запусти через executor║
 -- ╚══════════════════════════════════════════════════════════╝
@@ -93,106 +93,124 @@ end
 --  ЧТЕНИЕ ПЕТОВ ИЗ БЕКПАКА
 -- ─────────────────────────────────────────────────────────────
 local function readPets(player)
-    local bp = player:FindFirstChild("Backpack") [cite: 7]
-    if not bp then return {} end [cite: 7]
+    local bp = player:FindFirstChild("Backpack")
+    if not bp then return {} end
 
-    local pets = {} [cite: 7]
-    local countMap = {}   -- name+mutation -> count [cite: 7]
+    local pets = {}
+    local countMap = {}   -- name+mutation -> count
 
-    for _, tool in ipairs(bp:GetChildren()) do [cite: 7]
-        if tool:IsA("Tool") and not IGNORE_TOOLS[tool.Name] then [cite: 7]
-            local ok, err = pcall(function() [cite: 8]
+    for _, tool in ipairs(bp:GetChildren()) do
+        if tool:IsA("Tool") and not IGNORE_TOOLS[tool.Name] then
+            local ok, err = pcall(function()
                 -- InfoGUI
-                local infoGUI = tool:FindFirstChild("InfoGUI") [cite: 8]
-                if infoGUI then [cite: 8]
-                    local earnings = "" [cite: 8]
-                    local mutation = "Normal" [cite: 8]
-                    local petName  = tool.Name [cite: 8, 9]
-                    local rarity   = "Common" [cite: 9]
+                local infoGUI = tool:FindFirstChild("InfoGUI")
+                if infoGUI then
+                    local earnings = ""
+                    local mutation = "Normal"
+                    local petName  = tool.Name
+                    local rarity   = "Common"
 
-                    for _, child in ipairs(infoGUI:GetDescendants()) do [cite: 9]
+                    for _, child in ipairs(infoGUI:GetDescendants()) do
                         -- Безопасно читаем .Text только у TextLabel/TextBox
-                        if not (child:IsA("TextLabel") or child:IsA("TextBox")) then continue end [cite: 9, 10]
+                        if not (child:IsA("TextLabel") or child:IsA("TextBox")) then continue end
                         
-                        local txt = child.Text [cite: 10]
-                        if type(txt) ~= "string" or txt == "" then continue end [cite: 10]
-                        local trimmed = txt:match("^%s*(.-)%s*$") -- убираем пробелы [cite: 10]
+                        local txt = child.Text
+                        if type(txt) ~= "string" or txt == "" then continue end
+                        -- Очищаем строку от любых пробелов, табов и переносов строк в начале/конце
+                        local trimmed = txt:match("^%s*(.-)%s*$")
 
                         -- По имени объекта (точное совпадение)
-                        local n = child.Name [cite: 10, 11]
-                        if n == "Earnings" then [cite: 11]
-                            earnings = trimmed [cite: 11]
-                        elseif n == "Mutation" then [cite: 11]
-                            if trimmed ~= "" then mutation = trimmed end [cite: 11, 12]
-                        elseif n == "Name" then [cite: 12]
-                            if trimmed ~= "" then petName = trimmed end [cite: 12]
-                        elseif n == "Rarity" then [cite: 13]
-                            if trimmed ~= "" then rarity = trimmed end [cite: 13]
+                        local n = child.Name
+                        if n == "Earnings" then
+                            earnings = trimmed
+                        elseif n == "Mutation" then
+                            if trimmed ~= "" then mutation = trimmed end
+                        elseif n == "Name" then
+                            if trimmed ~= "" then petName = trimmed end
+                        elseif n == "Rarity" then
+                            if trimmed ~= "" then rarity = trimmed end
                         end
 
                         -- По содержимому (формат "Ключ: Значение")
-                        local k, v = trimmed:match("^([%a]+):%s*(.+)$") [cite: 13, 14]
-                        if k and v then [cite: 14]
-                            k = k:lower() [cite: 14]
-                            if k == "earnings" then earnings = v [cite: 14]
-                            elseif k == "mutation" and v ~= "" then mutation = v [cite: 14, 15]
-                            elseif k == "rarity"   and v ~= "" then rarity   = v [cite: 15]
-                            elseif k == "name"     and v ~= "" then petName  = v [cite: 15, 16]
+                        local k, v = trimmed:match("^([%a]+):%s*(.+)$")
+                        if k and v then
+                            k = k:lower()
+                            v = v:match("^%s*(.-)%s*$") -- чистим значение от пробелов
+                            if k == "earnings" then earnings = v
+                            elseif k == "mutation" and v ~= "" then mutation = v
+                            elseif k == "rarity"   and v ~= "" then rarity   = v
+                            elseif k == "name"     and v ~= "" then petName  = v
                             end
                         end
                     end
 
-                    -- ИЗОБРАЖЕНИЕ ПЕТА (Безопасное чтение через проверки IsA)
-                    local imageId = "" [cite: 16, 17]
-                    local openThis = tool:FindFirstChild("Open This") [cite: 17]
-                    if openThis then [cite: 17]
-                        local imgPart = openThis:FindFirstChild("Paste the link to the image in here") [cite: 17]
-                        if imgPart then [cite: 17, 18]
-                            if imgPart:IsA("Decal") then [cite: 18]
-                                imageId = imgPart.Texture [cite: 18]
-                            elseif imgPart:IsA("ImageLabel") or imgPart:IsA("ImageButton") then [cite: 19, 20]
-                                imageId = imgPart.Image [cite: 20]
-                            elseif imgPart:IsA("StringValue") or imgPart:IsA("ObjectValue") then [cite: 19]
-                                imageId = tostring(imgPart.Value) [cite: 19]
+                    -- ИЗОБРАЖЕНИЕ ПЕТА (Полностью безопасное чтение свойств)
+                    local imageId = ""
+                    local openThis = tool:FindFirstChild("Open This")
+                    if openThis then
+                        local imgPart = openThis:FindFirstChild("Paste the link to the image in here")
+                        if imgPart then
+                            -- Проверяем тип объекта через IsA, чтобы не читать несуществующие свойства
+                            if imgPart:IsA("Decal") then
+                                imageId = imgPart.Texture
+                            elseif imgPart:IsA("ImageLabel") or imgPart:IsA("ImageButton") then
+                                imageId = imgPart.Image
+                            elseif imgPart:IsA("StringValue") or imgPart:IsA("ObjectValue") then
+                                imageId = tostring(imgPart.Value)
+                            elseif imgPart:IsA("Texture") then
+                                imageId = imgPart.Texture
+                            elseif imgPart:IsA("MeshPart") then
+                                imageId = imgPart.TextureID
+                            elseif imgPart:IsA("SpecialMesh") then
+                                imageId = imgPart.TextureId
                             end
                         end
                     end
 
-                    -- Нормализуем
-                    if mutation == "" then mutation = "Normal" end [cite: 22]
-                    if rarity   == "" then rarity   = "Common" end [cite: 22]
+                    -- ЖЕСТКАЯ НОРМАЛИЗАЦИЯ (Защита от сбоев в таблицах сортировки)
+                    if not mutation or type(mutation) ~= "string" or mutation:match("^%s*$") then 
+                        mutation = "Normal" 
+                    else
+                        mutation = mutation:match("^%s*(.-)%s*$") -- убираем случайные пробелы
+                    end
 
-                    local key = petName .. "|" .. mutation [cite: 23]
-                    countMap[key] = (countMap[key] or 0) + 1 [cite: 23]
+                    if not rarity or type(rarity) ~= "string" or rarity:match("^%s*$") then 
+                        rarity = "Common" 
+                    else
+                        rarity = rarity:match("^%s*(.-)%s*$") -- убираем случайные пробелы
+                    end
 
-                    table.insert(pets, { [cite: 23]
-                        name     = petName, [cite: 23]
-                        rarity   = rarity, [cite: 24]
-                        mutation = mutation, [cite: 24]
-                        earnings = earnings, [cite: 24]
-                        image    = imageId, [cite: 24]
-                        key      = key, [cite: 24, 25]
+                    local key = petName .. "|" .. mutation
+                    countMap[key] = (countMap[key] or 0) + 1
+
+                    table.insert(pets, {
+                        name     = petName,
+                        rarity   = rarity,
+                        mutation = mutation,
+                        earnings = earnings,
+                        image    = imageId,
+                        key      = key,
                     })
                 end -- if infoGUI
             end) -- pcall
             
-            if not ok then [cite: 25]
-                warn("[PetViewer] Ошибка чтения tool '" .. tool.Name .. "': " .. tostring(err)) [cite: 25]
-            end [cite: 26]
-        end [cite: 26]
-    end [cite: 26]
+            if not ok then
+                warn("[PetViewer] Ошибка чтения tool '" .. tool.Name .. "': " .. tostring(err))
+            end
+        end
+    end
 
     -- Дедупликация — оставляем уникальные (name+mutation), добавляем count
-    local seen   = {} [cite: 26]
-    local result = {} [cite: 26]
-    for _, p in ipairs(pets) do [cite: 26]
-        if not seen[p.key] then [cite: 26]
-            seen[p.key] = true [cite: 26]
-            p.count = countMap[p.key] [cite: 26]
-            table.insert(result, p) [cite: 27]
-        end [cite: 27]
-    end [cite: 27]
-    return result [cite: 27]
+    local seen   = {}
+    local result = {}
+    for _, p in ipairs(pets) do
+        if not seen[p.key] then
+            seen[p.key] = true
+            p.count = countMap[p.key]
+            table.insert(result, p)
+        end
+    end
+    return result
 end
 
 -- ─────────────────────────────────────────────────────────────
