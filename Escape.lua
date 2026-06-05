@@ -3,7 +3,6 @@ local Window = OrionLib:MakeWindow({Name = "Tsunami For Cats", HidePremium = fal
 
 local scripts = {
     'Troll.lua', 
-	'TrollSell.lua',
 	'PVP.lua',
 }
 
