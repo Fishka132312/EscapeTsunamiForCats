@@ -171,7 +171,7 @@ local function collectBaseData(plot)
 				local upgradeCost = getUpgradeCost(slot)
 
 				-- Показываем слот только если есть пет ИЛИ есть кнопка апгрейда
-				if petData or upgradeCost then
+				if petData then
 					local floorName, slotName = getSlotMeta(slot)
 					table.insert(floorData.slots, {
 						slotName    = slotName,
@@ -368,19 +368,6 @@ local function updateGUISlots(floors)
 					earnLabel.TextXAlignment = Enum.TextXAlignment.Left
 					earnLabel.Parent = card
 				end
-			else
-				-- Пустой слот
-				local emptyLabel = Instance.new("TextLabel")
-				emptyLabel.Text = "🔒  Empty Slot"
-				emptyLabel.Font = Enum.Font.Gotham
-				emptyLabel.TextSize = 13
-				emptyLabel.TextColor3 = Color3.fromRGB(100, 110, 150)
-				emptyLabel.BackgroundTransparency = 1
-				emptyLabel.Size = UDim2.new(0, 220, 0, 26)
-				emptyLabel.Position = UDim2.new(0, 20, 0.5, -13)
-				emptyLabel.TextXAlignment = Enum.TextXAlignment.Left
-				emptyLabel.Parent = card
-			end
 
 			-- Кнопка апгрейда
 			if slotData.upgradeCost and slotData.floorName ~= "" and slotData.slotName ~= "" then
