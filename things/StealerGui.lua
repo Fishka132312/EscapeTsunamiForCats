@@ -147,7 +147,6 @@ local activeFilters = {
 local petCache = {}
 
 -- Функция: извлечь данные пета из его InfoGUI и Head
--- Функция: извлечь данные пета из его InfoGUI и Head (ОБНОВЛЕННАЯ СТРУКТУРА)
 local function extractPetData(pet, rarityKey)
     local data = {
         rarityKey = rarityKey,
