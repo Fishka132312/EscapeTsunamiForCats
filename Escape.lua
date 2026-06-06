@@ -104,6 +104,13 @@ Tab:AddButton({
 })
 
 Tab:AddButton({
+    Name = "Local Base",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/LocalBase.lua'))()
+    end    
+})
+
+Tab:AddButton({
     Name = "Inventory Checker",
     Callback = function()
         loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/InventoryChecker.lua'))()
