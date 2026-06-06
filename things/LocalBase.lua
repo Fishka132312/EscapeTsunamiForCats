@@ -1,5 +1,5 @@
 -- PetBaseGUI LocalScript
--- Показывает всех петов по этажам, их инфу и кнопку апгрейдалол
+-- Показывает всех петов по этажам, их инфу и кнопку апгрейдалолдщддщдщ
 
 local Players         = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -461,6 +461,11 @@ end
 -- ══════════════════════════════════════════
 
 local function buildGUI(floors)
+
+	-- Удаляем предыдущий инстанс если есть (для hot-reload)
+if PlayerGui:FindFirstChild("PetBaseGUI") then
+    PlayerGui:FindFirstChild("PetBaseGUI"):Destroy()
+end
 	-- Удаляем старый если есть
 	if PetBaseGUI then PetBaseGUI:Destroy() end
 
