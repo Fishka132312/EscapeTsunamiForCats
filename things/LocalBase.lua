@@ -1,5 +1,5 @@
 -- PetBaseGUI LocalScript
--- Показывает всех петов по этажам, их инфу и кнопку апгрейда
+-- Показывает всех петов по этажам, их инфу и кнопку апгрейдавыфвы
 
 local Players         = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,14 +18,28 @@ end
 
 -- Цвет редкости
 local RARITY_COLORS = {
-	Common    = Color3.fromRGB(180, 180, 180),
-	Uncommon  = Color3.fromRGB(80,  200,  80),
-	Rare      = Color3.fromRGB(80,  140, 255),
-	Epic      = Color3.fromRGB(170,  80, 255),
-	Legendary = Color3.fromRGB(255, 180,  30),
-	Mythic    = Color3.fromRGB(255,  60,  60),
-	Secret    = Color3.fromRGB(255, 100, 200),
+    Common           = Color3.fromRGB(180, 180, 180),
+    Uncommon         = Color3.fromRGB(71,  231, 160),
+    Rare             = Color3.fromRGB(0,   242, 255),
+    Epic             = Color3.fromRGB(255,  71, 255),
+    Legendary        = Color3.fromRGB(255, 162,   0),
+    Mythical         = Color3.fromRGB(255,  99, 152),
+    OG               = Color3.fromRGB(52,  214, 137),
+    SpecialItemSpawn = Color3.fromRGB(80,  220, 255),
 }
+
+local MUTATION_COLORS = {
+    Normal  = Color3.fromRGB(200, 200, 200),
+    Golden  = Color3.fromRGB(255, 247,   0),
+    Diamond = Color3.fromRGB(25,  255, 255),
+    Ruby    = Color3.fromRGB(255,  23,  55),
+    Rainbow = Color3.fromRGB(0,   255, 170),
+    Blood   = Color3.fromRGB(255,   0,   0),
+    Neon    = Color3.fromRGB(215, 255,   0),
+    Divine  = Color3.fromRGB(255, 232,  36),
+}
+
+local DEFAULT_MUTATION_COLOR = Color3.fromRGB(200, 160, 255)
 
 local function rarityColor(rarity)
 	for k, v in pairs(RARITY_COLORS) do
@@ -465,17 +479,27 @@ local function buildGUI(floors)
 
 				-- Мутация
 				if pet.mutation ~= "" and pet.mutation:lower() ~= "none" and pet.mutation ~= "-" then
-					local mutLabel = Instance.new("TextLabel")
-					mutLabel.Text = "✨ " .. pet.mutation
-					mutLabel.Font = Enum.Font.Gotham
-					mutLabel.TextSize = 11
-					mutLabel.TextColor3 = Color3.fromRGB(200, 160, 255)
-					mutLabel.BackgroundTransparency = 1
-					mutLabel.Size = UDim2.new(0, 150, 0, 16)
-					mutLabel.Position = UDim2.new(0, 96, 0, 55)
-					mutLabel.TextXAlignment = Enum.TextXAlignment.Left
-					mutLabel.Parent = card
-				end
+	local mutLabel = Instance.new("TextLabel")
+	mutLabel.Text = "✨ " .. pet.mutation
+	mutLabel.Font = Enum.Font.Gotham
+	mutLabel.TextSize = 11
+	
+	-- Ищем цвет в таблице. Проверяем совпадение, приводя всё к нижнему регистру
+	local targetColor = DEFAULT_MUTATION_COLOR
+	for mutName, color in pairs(MUTATION_COLORS) do
+		if mutName:lower() == pet.mutation:lower() then
+			targetColor = color
+			break
+		end
+	end
+	
+	mutLabel.TextColor3 = targetColor
+	mutLabel.BackgroundTransparency = 1
+	mutLabel.Size = UDim2.new(0, 150, 0, 16)
+	mutLabel.Position = UDim2.new(0, 96, 0, 55)
+	mutLabel.TextXAlignment = Enum.TextXAlignment.Left
+	mutLabel.Parent = card
+end
 
 				-- Заработок
 				if pet.earnings ~= "" then
