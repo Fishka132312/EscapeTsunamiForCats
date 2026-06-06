@@ -273,19 +273,6 @@ local function buildGUI(floors)
 	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 	titleLabel.Parent = header
 
-	-- Кнопка обновить
-	local refreshBtn = Instance.new("TextButton")
-	refreshBtn.Text = "↺"
-	refreshBtn.Font = Enum.Font.GothamBold
-	refreshBtn.TextSize = 18
-	refreshBtn.TextColor3 = Color3.fromRGB(130, 180, 255)
-	refreshBtn.BackgroundColor3 = Color3.fromRGB(30, 36, 60)
-	refreshBtn.Size = UDim2.new(0, 34, 0, 34)
-	refreshBtn.Position = UDim2.new(1, -94, 0.5, -17)
-	refreshBtn.BorderSizePixel = 0
-	refreshBtn.Parent = header
-	Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 8)
-
 	-- Кнопка свернуть
 	local minimizeBtn = Instance.new("TextButton")
 	minimizeBtn.Text = "—"
@@ -301,7 +288,7 @@ local function buildGUI(floors)
 
 	-- Кнопка закрыть
 	local closeBtn = Instance.new("TextButton")
-	closeBtn.Text = "✕"
+	closeBtn.Text = "X"
 	closeBtn.Font = Enum.Font.GothamBold
 	closeBtn.TextSize = 15
 	closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
@@ -329,7 +316,7 @@ local function buildGUI(floors)
 	end
 
 	local statusLabel = Instance.new("TextLabel")
-	statusLabel.Text = string.format("📊  %d этажей  •  %d петов обнаружено", #floors, totalPets)
+	statusLabel.Text = string.format("📊  %d Floors  •  %d pets found", #floors, totalPets)
 	statusLabel.Font = Enum.Font.Gotham
 	statusLabel.TextSize = 12
 	statusLabel.TextColor3 = Color3.fromRGB(100, 140, 220)
@@ -517,7 +504,7 @@ end
 			else
 				-- Слот без пета (только апгрейд)
 				local emptyLabel = Instance.new("TextLabel")
-				emptyLabel.Text = "🔒  Пустой слот"
+				emptyLabel.Text = "🔒  Empty Slot"
 				emptyLabel.Font = Enum.Font.Gotham
 				emptyLabel.TextSize = 13
 				emptyLabel.TextColor3 = Color3.fromRGB(100, 110, 150)
@@ -575,7 +562,7 @@ end
 				upgradeBtn.MouseButton1Click:Connect(function()
 					RequestSlotUpgrade:FireServer(fn, sn)
 					-- Визуальный фидбек
-					upgText.Text = "⏳ Отправлено"
+					upgText.Text = "⏳ Send"
 					task.delay(1.5, function()
 						if upgText and upgText.Parent then
 							upgText.Text = "⬆ UPGRADE\n" .. slotData.upgradeCost
@@ -616,22 +603,13 @@ end
 				Size = UDim2.new(0, MAIN_W, 0, 52),
 			}):Play()
 			minimized = true
-			minimizeBtn.Text = "□"
+			minimizeBtn.Text = "—"
 		else
 			TweenService:Create(main, TweenInfo.new(0.25, Enum.EasingStyle.Quad), {
 				Size = UDim2.new(0, MAIN_W, 0, MAIN_H),
 			}):Play()
 			minimized = false
 			minimizeBtn.Text = "—"
-		end
-	end)
-
-	-- ── Кнопка обновить ─────────────────────────────────────────
-	refreshBtn.MouseButton1Click:Connect(function()
-		local plot2 = workspace:FindFirstChild("Plot_" .. LocalPlayer.Name)
-		if plot2 then
-			local newFloors = collectBaseData(plot2)
-			buildGUI(newFloors)
 		end
 	end)
 
@@ -679,13 +657,28 @@ task.spawn(function()
 	local plotName = "Plot_" .. LocalPlayer.Name
 	local plot = workspace:WaitForChild(plotName, 15)
 	if not plot then
-		warn("[PetBaseGUI] Не найден Plot: " .. plotName)
+		warn("[PetBaseGUI] No Plot: " .. plotName)
 		return
 	end
 
-	local floors = collectBaseData(plot)
-	buildGUI(floors)
-	print(string.format("[PetBaseGUI] Загружено: %d этажей", #floors))
+	-- Запускаем бесконечный цикл в фоновом потоке
+	while true do
+		-- Проверяем, не закрыл ли пользователь GUI кнопкой "X"
+		-- Если окошко закрыто вручную, цикл останавливается, чтобы не тратить ресурсы
+		local currentGui = LocalPlayer.PlayerGui:FindFirstChild("PetBaseGUI")
+		if currentGui and not currentGui:FindFirstChild("Main") then
+			break
+		end
+
+		-- Собираем свежие данные с базы
+		local floors = collectBaseData(plot)
+		
+		-- Перестраиваем интерфейс с новыми данными
+		buildGUI(floors)
+		
+		-- Ждём 5 секунд перед следующим обновлением
+		task.wait(5)
+	end
 end)
 
 return {}
