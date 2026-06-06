@@ -471,6 +471,14 @@ Tab:AddToggle({
     end    
 })
 
+Tab:AddButton({
+    Name = "Unlock All Index",
+    Callback = function()
+        loadstring(game:HttpGet('https://raw.githubusercontent.com/Fishka132312/EscapeTsunamiForCats/refs/heads/main/things/UnlockAllIndex.lua'))()
+    end    
+})
+
+
 local Tab = Window:MakeTab({
 	Name = "Total Domination",
 	Icon = "rbxassetid://4483345998",
