@@ -1,5 +1,5 @@
 -- PetBaseGUI LocalScript
--- Показывает всех петов по этажам, их инфу и кнопку апгрейдалолдщддщдщ
+-- Показывает всех петов по этажам, их инфу и кнопку апгрейдакакака
 
 local Players         = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -462,12 +462,10 @@ end
 
 local function buildGUI(floors)
 
-	-- Удаляем предыдущий инстанс если есть (для hot-reload)
-if PlayerGui:FindFirstChild("PetBaseGUI") then
-    PlayerGui:FindFirstChild("PetBaseGUI"):Destroy()
-end
-	-- Удаляем старый если есть
-	if PetBaseGUI then PetBaseGUI:Destroy() end
+	local oldGUI = LocalPlayer.PlayerGui:FindFirstChild("PetBaseGUI")
+	if oldGUI then 
+		oldGUI:Destroy() 
+	end
 
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name          = "PetBaseGUI"
@@ -559,8 +557,8 @@ end
 	closeBtn.Text = "X"
 	closeBtn.Font = Enum.Font.GothamBold
 	closeBtn.TextSize = 15
-	closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
-	closeBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 25)
+	closeBtn.TextColor3     = Color3.fromRGB(255, 255, 255)
+	closeBtn.BackgroundColor3= Color3.fromRGB(180, 40, 60)
 	closeBtn.Size = UDim2.new(0, 34, 0, 34)
 	closeBtn.Position = UDim2.new(1, -52, 0.5, -17)
 	closeBtn.BorderSizePixel = 0
