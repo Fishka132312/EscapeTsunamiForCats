@@ -1,5 +1,5 @@
 -- PetBaseGUI LocalScript
--- Показывает всех петов по этажам, их инфу и кнопку апгрейдавыфвы
+-- Показывает всех петов по этажам, их инфу и кнопку апгрейдалол
 
 local Players         = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -368,6 +368,8 @@ local function updateGUISlots(floors)
 					earnLabel.TextXAlignment = Enum.TextXAlignment.Left
 					earnLabel.Parent = card
 				end
+			else
+			end
 
 			-- Кнопка апгрейда
 			if slotData.upgradeCost and slotData.floorName ~= "" and slotData.slotName ~= "" then
