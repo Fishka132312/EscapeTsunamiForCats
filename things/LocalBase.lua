@@ -282,16 +282,34 @@ local function updateGUISlots(floors)
 
 			if pet then
 				-- Изображение
-				local petImg = Instance.new("ImageLabel")
-				petImg.Size   = UDim2.new(0, 70, 0, 70)
-				petImg.Position = UDim2.new(0, 14, 0.5, 0)
-				petImg.AnchorPoint = Vector2.new(0, 0.5)
-				petImg.BackgroundColor3 = Color3.fromRGB(25, 30, 52)
-				petImg.BorderSizePixel = 0
-				petImg.Image = pet.imageId
-				petImg.ScaleType = Enum.ScaleType.Fit
-				petImg.Parent = card
-				Instance.new("UICorner", petImg).CornerRadius = UDim.new(0, 8)
+				-- Изображение пета с учётом мутации
+local petImg = Instance.new("ImageLabel")
+petImg.Size   = UDim2.new(0, 70, 0, 70)
+petImg.Position = UDim2.new(0, 14, 0.5, 0)
+petImg.AnchorPoint = Vector2.new(0, 0.5)
+petImg.BackgroundColor3 = Color3.fromRGB(25, 30, 52)
+petImg.BorderSizePixel = 0
+petImg.Image = pet.imageId
+petImg.ScaleType = Enum.ScaleType.Fit
+petImg.Parent = card
+Instance.new("UICorner", petImg).CornerRadius = UDim.new(0, 8)
+
+-- Применяем цвет мутации (как в игре)
+if pet.mutation and pet.mutation ~= "" and pet.mutation:lower() ~= "none" and pet.mutation:lower() ~= "-" then
+	local mutationColor = DEFAULT_MUTATION_COLOR
+	
+	for mutName, color in pairs(MUTATION_COLORS) do
+		if mutName:lower() == pet.mutation:lower() then
+			mutationColor = color
+			break
+		end
+	end
+	
+	petImg.ImageColor3 = mutationColor
+	petImg.ImageTransparency = 0.1  -- лёгкая прозрачность, чтобы было красиво (можно 0)
+else
+	petImg.ImageColor3 = Color3.fromRGB(255, 255, 255)
+end
 
 				-- Имя
 				local nameLabel = Instance.new("TextLabel")
@@ -462,7 +480,7 @@ local function buildGUI(floors)
 	main.Position        = UDim2.new(0.5, -MAIN_W/2, 0.5, -MAIN_H/2)
 	main.BackgroundColor3 = Color3.fromRGB(12, 14, 22)
 	main.BorderSizePixel = 0
-	main.ClipsDescendants = true
+	main.ClipsDescendants = false
 	main.Parent          = screenGui
 
 	-- Скруглённые углы
@@ -527,6 +545,7 @@ local function buildGUI(floors)
 	minimizeBtn.Size = UDim2.new(0, 34, 0, 34)
 	minimizeBtn.Position = UDim2.new(1, -56, 0.5, -17)
 	minimizeBtn.BorderSizePixel = 0
+	minimizeBtn.ZIndex = 10
 	minimizeBtn.Parent = header
 	Instance.new("UICorner", minimizeBtn).CornerRadius = UDim.new(0, 8)
 
@@ -540,6 +559,7 @@ local function buildGUI(floors)
 	closeBtn.Size = UDim2.new(0, 34, 0, 34)
 	closeBtn.Position = UDim2.new(1, -14, 0.5, -17)
 	closeBtn.BorderSizePixel = 0
+	closeBtn.ZIndex = 10
 	closeBtn.Parent = header
 	Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 8)
 
