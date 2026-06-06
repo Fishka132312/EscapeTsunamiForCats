@@ -543,7 +543,7 @@ local function buildGUI(floors)
 	minimizeBtn.TextColor3 = Color3.fromRGB(130, 180, 255)
 	minimizeBtn.BackgroundColor3 = Color3.fromRGB(30, 36, 60)
 	minimizeBtn.Size = UDim2.new(0, 34, 0, 34)
-	minimizeBtn.Position = UDim2.new(1, -56, 0.5, -17)
+	minimizeBtn.Position = UDim2.new(1, -94, 0.5, -17)
 	minimizeBtn.BorderSizePixel = 0
 	minimizeBtn.ZIndex = 10
 	minimizeBtn.Parent = header
@@ -557,7 +557,7 @@ local function buildGUI(floors)
 	closeBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
 	closeBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 25)
 	closeBtn.Size = UDim2.new(0, 34, 0, 34)
-	closeBtn.Position = UDim2.new(1, -14, 0.5, -17)
+	closeBtn.Position = UDim2.new(1, -52, 0.5, -17)
 	closeBtn.BorderSizePixel = 0
 	closeBtn.ZIndex = 10
 	closeBtn.Parent = header
@@ -930,9 +930,9 @@ task.spawn(function()
 	local firstFloors = collectBaseData(plot)
 	buildGUI(firstFloors)
 
-	-- Автообновление каждые 5 секунд
+	-- Автообновление каждые 2 секунд
 	while PetBaseGUI and PetBaseGUI.Parent do
-		task.wait(5)
+		task.wait(2)
 		local newFloors = collectBaseData(plot)
 		updateGUISlots(newFloors)
 	end
